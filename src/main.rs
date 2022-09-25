@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate glium;
 
-use std::time;
+use std::{time, ffi::CString, io::Cursor};
 
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
@@ -15,7 +15,7 @@ fn main() {
 
     // the main loop
     event_loop.run(move |event, _, control_flow| {
-        render_triangle(&display);
+        // render_triangle(&display);
 
         *control_flow = match event {
             event::Event::WindowEvent { event, .. } => match event {
@@ -67,15 +67,16 @@ fn render_triangle(display: &glium::Display) {
         struct Vertex {
             position: [f32; 3],
             color: [f32; 3],
+            tex: [f32; 2],
         }
 
-        implement_vertex!(Vertex, position, color);
+        implement_vertex!(Vertex, position, color, tex);
 
         glium::VertexBuffer::new(display,
             &[
-                Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
-                Vertex { position: [ 0.0,  0.5, 0.0], color: [0.0, 0.0, 1.0] },
-                Vertex { position: [ 0.5, -0.5, 0.0], color: [1.0, 0.0, 0.0] },
+                Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0], tex: [0.0, 0.0] },
+                Vertex { position: [ 0.0,  0.5, 0.0], color: [0.0, 0.0, 1.0], tex: [0.5, 1.0] },
+                Vertex { position: [ 0.5, -0.5, 0.0], color: [1.0, 0.0, 0.0], tex: [1.0, 0.0] },
             ]
         ).unwrap()
     };
@@ -84,61 +85,13 @@ fn render_triangle(display: &glium::Display) {
     let index_buffer = glium::IndexBuffer::new(display, PrimitiveType::TrianglesList,
                                                &[0u16, 1, 2]).unwrap();
 
+    let image = image::load(Cursor::new(&include_bytes!("container.jpg")), image::ImageFormat::Jpeg).unwrap().to_rgba8();
+    let image_dimensions = image.dimensions();
+    let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
+    let opengl_texture = glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap();
+
     // compiling shaders and linking them together
     let program = program!(display,
-        // 110 => {
-        //     vertex: "
-        //         #version 110
-
-        //         uniform mat4 matrix;
-
-        //         attribute vec2 position;
-        //         attribute vec3 color;
-
-        //         varying vec3 vColor;
-
-        //         void main() {
-        //             gl_Position = vec4(position, 0.0, 1.0) * matrix;
-        //             vColor = color;
-        //         }
-        //     ",
-
-        //     fragment: "
-        //         #version 110
-        //         varying vec3 vColor;
-
-        //         void main() {
-        //             gl_FragColor = vec4(vColor, 1.0);
-        //         }
-        //     ",
-        // },
-
-        // 100 => {
-        //     vertex: "
-        //         #version 100
-
-        //         uniform lowp mat4 matrix;
-
-        //         attribute lowp vec2 position;
-        //         attribute lowp vec3 color;
-
-        //         varying lowp vec3 vColor;
-
-        //         void main() {
-        //             gl_Position = vec4(position, 0.0, 1.0) * matrix;
-        //             vColor = color;
-        //         }
-        //     ",
-
-        //     fragment: "
-        //         #version 100
-        //         varying lowp vec3 vColor;
-
-        //         void main() {
-        //             gl_FragColor = vec4(vColor, 1.0);
-        //         }
-        //     ",
-        // },
 
         330 => {
             vertex: "
@@ -146,24 +99,30 @@ fn render_triangle(display: &glium::Display) {
                 
                 in vec3 position;
                 in vec3 color;
+                in vec2 tex;
 
                 out vec3 ourColor;
+                out vec2 texCoord;
                 
                 void main()
                 {
                     gl_Position = vec4(position, 1.0);
                     ourColor = color;
+                    texCoord = tex;
                 }
             ",
             fragment: "
                 #version 330 core
 
                 in vec3 ourColor;
+                in vec2 texCoord;
 
                 out vec4 FragColor;
+
+                uniform sampler2D ourTexture;
                 
                 void main() {
-                    FragColor = vec4(ourColor, 1.0);
+                    FragColor = texture(ourTexture, texCoord) * vec4(ourColor, 1.0);
                 }
             ",
         }
@@ -177,6 +136,7 @@ fn render_triangle(display: &glium::Display) {
     let draw = move || {
         let now = time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_secs_f64();
         let green_value = (now.sin() / 2.0 + 0.5) as f32;
+        // let t = glium::uniforms::UniformValue::CompressedSrgbTexture2d(opengl_texture, Some(glium::uniforms::SamplerBehavior::default()));
         // building the uniforms
         let uniforms = uniform! {
             matrix: [
@@ -185,7 +145,9 @@ fn render_triangle(display: &glium::Display) {
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0]
             ],
-            ourColor: [0.0, green_value, 0.0, 1.0]
+            ourColor: [0.0, green_value, 0.0, 1.0],
+            // tex: &opengl_texture
+            ourTexture: &opengl_texture
         };
 
         // drawing a frame
