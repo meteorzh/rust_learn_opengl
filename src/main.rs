@@ -90,6 +90,11 @@ fn render_triangle(display: &glium::Display) {
     let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
     let opengl_texture = glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap();
 
+    let image2 = image::load(Cursor::new(&include_bytes!("awesomeface.png")), image::ImageFormat::Png).unwrap().to_rgba8();
+    let image_dimensions2 = image2.dimensions();
+    let image2 = glium::texture::RawImage2d::from_raw_rgba_reversed(&image2.into_raw(), image_dimensions2);
+    let opengl_texture2 = glium::texture::CompressedSrgbTexture2d::new(display, image2).unwrap();
+
     // compiling shaders and linking them together
     let program = program!(display,
 
@@ -120,9 +125,10 @@ fn render_triangle(display: &glium::Display) {
                 out vec4 FragColor;
 
                 uniform sampler2D ourTexture;
+                uniform sampler2D ourTexture2;
                 
                 void main() {
-                    FragColor = texture(ourTexture, texCoord) * vec4(ourColor, 1.0);
+                    FragColor = mix(texture(ourTexture, texCoord), texture(ourTexture2, texCoord), 0.2);
                 }
             ",
         }
@@ -147,7 +153,8 @@ fn render_triangle(display: &glium::Display) {
             ],
             ourColor: [0.0, green_value, 0.0, 1.0],
             // tex: &opengl_texture
-            ourTexture: &opengl_texture
+            ourTexture: &opengl_texture,
+            ourTexture2: &opengl_texture2,
         };
 
         // drawing a frame
