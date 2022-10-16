@@ -9,7 +9,7 @@ use std::{time::{self}, sync::Mutex, collections::HashMap};
 use cgmath::{SquareMatrix, Point3, Matrix4, EuclideanSpace, Vector3};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{index::PrimitiveType, glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState}, window::CursorGrabMode}, VertexBuffer, IndexBuffer, Program, uniforms::{UniformsStorage, EmptyUniforms, AsUniformValue}};
+use glium::{index::PrimitiveType, glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState}, window::CursorGrabMode}, VertexBuffer, IndexBuffer, Program, uniforms::{UniformsStorage, EmptyUniforms, AsUniformValue, Uniforms}};
 
 use rust_opengl_learn::camera::{Camera, CameraController};
 
@@ -52,28 +52,33 @@ fn main() {
                 in vec3 fragPos;
         
                 out vec4 FragColor;
+
+                struct Material {
+                    vec3 ambient;
+                    vec3 diffuse;
+                    vec3 specular;
+                    float shininess;
+                }; 
+                
+                uniform Material material;
         
                 uniform vec3 color;
                 uniform vec3 lightColor;
                 uniform vec3 lightPos;
                 uniform vec3 viewPos;
-                uniform vec3 ambient;
-                uniform vec3 diffuse;
-                uniform vec3 specular;
-                uniform float shininess;
                 
                 void main() {
-                    vec3 ambient = vec3(0.1) * ambient;
+                    vec3 ambient = vec3(0.1) * material.ambient;
 
                     vec3 norm = normalize(oNormal);
                     vec3 lightDir = normalize(lightPos - fragPos);
                     float diff = max(dot(norm, lightDir), 0.0);
-                    vec3 diffuse = vec3(1.0) * (diff * diffuse);
+                    vec3 diffuse = vec3(1.0) * (diff * material.diffuse);
 
                     vec3 viewDir = normalize(viewPos - fragPos);
                     vec3 reflectDir = reflect(-lightDir, norm);
-                    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-                    vec3 specular = vec3(1.0) * (spec * specular);
+                    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+                    vec3 specular = vec3(1.0) * (spec * material.specular);
 
                     vec3 result = (ambient + diffuse + specular) * color;
         
@@ -374,13 +379,5 @@ impl Material {
 
     pub fn empty() -> Material {
         Material::new([0_f32; 3], [0_f32; 3], [0_f32; 3], 0_f32)
-    }
-}
-
-impl AsUniformValue for Material {
-
-    fn as_uniform_value(&self) -> glium::uniforms::UniformValue<'_> {
-        // glium::uniforms::UniformValue::Block((), ())
-        todo!()
     }
 }
