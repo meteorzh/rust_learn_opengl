@@ -8,9 +8,9 @@ use std::{time::{self}, io::Cursor};
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{index::PrimitiveType, glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState}, window::CursorGrabMode}};
 
-use cgmath::{prelude::*};
+use rust_opengl_learn::camera::{Camera, CameraController};
 
-// 使用自己学习过程中写的camera
+// 使用了网上找的封装了camera的类
 
 fn main() {
     let event_loop = event_loop::EventLoop::new();
@@ -131,17 +131,18 @@ fn main() {
     let mut degree = 0_f32;
     let mut scale = 1_f32;
     let mut scale_step = 0.01_f32;
-    let mut pitch = 0_f32;
-    let mut yaw = 270_f32;
-    let mouse_sensitivity = 0.5_f32;
-    let mut camera_x = 0_f32;
-    let mut camera_z = 3_f32;
 
     let model_matrix = cgmath::Matrix4::from_angle_x(cgmath::Deg(-60.0_f32));
     // let model_matrix = cgmath::Matrix4::<f32>::identity();
+    // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = 270°;
+    let mut camera = Camera::new(
+        cgmath::Point3::new(0_f32, 0_f32, 3_f32), 
+        cgmath::Rad::from(cgmath::Deg(270_f32)), 
+        cgmath::Rad::from(cgmath::Deg(0_f32))
+    );
+    let mut controller = CameraController::new(1_f32, 0.5_f32);
     
-    
-    let projection_matrix = cgmath::perspective(cgmath::Deg(60.0), size.width as f32 / size.height as f32, 0.1_f32, 100.0);
+    let projection_matrix = cgmath::perspective(cgmath::Deg(45.0), size.width as f32 / size.height as f32, 0.1_f32, 100.0);
     // println!("{:#?}", projection_matrix);
 
     let draw_parameters = glium::DrawParameters {
@@ -173,6 +174,8 @@ fn main() {
         s
     };
 
+    let mut last_frame = time::Instant::now();
+
     // the main loop
     event_loop.run(move |event, _, control_flow| {
         // render_triangle(&display);
@@ -193,7 +196,7 @@ fn main() {
                 },
                 // key input
                 event::WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(cf) = handle_keyboard_input(input, &mut camera_x, &mut camera_z) {
+                    if let Some(cf) = handle_keyboard_input(input, &mut controller) {
                         *control_flow = cf;
                     }
                 },
@@ -201,17 +204,10 @@ fn main() {
             },
             event::Event::DeviceEvent { event, .. } => match event {
                 event::DeviceEvent::MouseMotion { delta } => {
-                    let xoffset = (delta.0 as f32) * mouse_sensitivity;
-                    let yoffset = (-delta.1 as f32) * mouse_sensitivity;
-
-                    pitch += yoffset;
-                    yaw += xoffset;
-                    if pitch >= 90_f32 {
-                        pitch = 89.999_f32;
-                    }
-                    if pitch <= -90_f32 {
-                        pitch = -89.000_f32;
-                    }
+                    controller.process_mouse(delta.0, delta.1)
+                },
+                event::DeviceEvent::MouseWheel { delta } => {
+                    controller.process_scroll(&delta);
                 },
                 _ => {},
             },
@@ -233,8 +229,12 @@ fn main() {
         }
 
         // 帧率设为60FPS，那么1帧16.66666666~毫秒，取16666667纳秒
-        let next_frame_time = time::Instant::now() + time::Duration::from_nanos(16_666_667);
+        let current = time::Instant::now();
+        let next_frame_time = current + time::Duration::from_nanos(16_666_667);
         *control_flow = event_loop::ControlFlow::WaitUntil(next_frame_time);
+
+        let delta_frame = current.duration_since(last_frame);
+        last_frame = current;
 
         degree += 0.1;
         if scale >= 1.5_f32 {
@@ -247,14 +247,9 @@ fn main() {
         }
         scale += scale_step;
 
-        let yaw_deg = cgmath::Deg(yaw);
-        // 摄像机矩阵
-        let view_matrix = cgmath::Matrix4::look_to_rh(
-            cgmath::Point3::new(camera_x, 0_f32, camera_z), 
-            // 默认(1, 0, 0)
-            cgmath::Vector3::new(yaw_deg.cos(), cgmath::Deg(pitch).sin(), yaw_deg.sin()).normalize(), 
-            cgmath::Vector3::unit_y()
-        );
+        // 摄像机观察矩阵
+        controller.update_camera(&mut camera, delta_frame);
+        let view_matrix = camera.calc_matrix();
 
         let trans = cgmath::Matrix4::from_angle_z(cgmath::Deg(degree));
         // let trans = trans * cgmath::Matrix4::from_scale(scale);
@@ -292,38 +287,22 @@ fn main() {
     });
 }
 
-fn handle_keyboard_input(input: KeyboardInput, camera_x: &mut f32, camera_z: &mut f32) -> Option<event_loop::ControlFlow> {
+fn handle_keyboard_input(input: KeyboardInput, camera_controller: &mut CameraController) -> Option<event_loop::ControlFlow> {
     let virtual_keycode = input.virtual_keycode;
     if let None = virtual_keycode {
         return None;
     }
 
     let virtual_keycode = virtual_keycode.unwrap();
+    let camera_handle = camera_controller.process_keyboard(virtual_keycode, input.state);
+    if camera_handle {
+        return None;
+    }
+
     match virtual_keycode {
         VirtualKeyCode::Escape => {
             if input.state == ElementState::Released {
                 return Some(event_loop::ControlFlow::Exit);
-            }
-        },
-        VirtualKeyCode::A => {
-            // 按下A键，摄像机视角减小1°
-            if input.state == ElementState::Pressed {
-                *camera_x -= 0.1;
-            }
-        },
-        VirtualKeyCode::D => {
-            if input.state == ElementState::Pressed {
-                *camera_x += 0.1
-            }
-        },
-        VirtualKeyCode::W => {
-            if input.state == ElementState::Pressed {
-                *camera_z -= 0.1
-            }
-        },
-        VirtualKeyCode::S => {
-            if input.state == ElementState::Pressed {
-                *camera_z += 0.1
             }
         },
         _ => {
