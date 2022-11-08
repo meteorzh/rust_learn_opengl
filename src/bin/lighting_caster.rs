@@ -1,4 +1,4 @@
-// learn open gl 光照学习
+// learn open gl 光照-投光物学习
 
 #[macro_use]
 extern crate glium;
@@ -6,7 +6,7 @@ extern crate cgmath;
 
 use std::{time::{self}, sync::Mutex, collections::HashMap, io::Cursor};
 
-use cgmath::{SquareMatrix, Point3, Matrix4, EuclideanSpace, Vector3};
+use cgmath::{SquareMatrix, Point3, Matrix4, EuclideanSpace, Vector3, InnerSpace, Angle};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{index::PrimitiveType, glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState}, window::CursorGrabMode}, VertexBuffer, IndexBuffer, Program, uniforms::{UniformsStorage, EmptyUniforms, AsUniformValue, Uniforms}, texture::CompressedSrgbTexture2d};
@@ -65,11 +65,25 @@ fn main() {
                 };
 
                 struct Light {
+                    // 点光源位置
                     vec3 position;
-                
+                    // 平行光光源方向
+                    vec3 direction;
+                    // 环境光属性
                     vec3 ambient;
                     vec3 diffuse;
                     vec3 specular;
+                    // 点光源衰减
+                    float constant;
+                    float linear;
+                    float quadratic;
+                    // 聚光灯信息
+                    vec3  spot_position;
+                    vec3  spot_direction;
+                    float cutOff;
+                    float outerCutOff;
+                    vec3 spot_diffuse;
+                    vec3 spot_specular;
                 };
                 
                 uniform Material material;
@@ -78,21 +92,61 @@ fn main() {
                 uniform vec3 viewPos;
                 
                 void main() {
-                    vec3 ambient = light.ambient * vec3(texture(material.diffuse, TexCoords));
+                    vec3 spot_dir = normalize(light.spot_position - fragPos);
+                    float theta = dot(spot_dir, normalize(-light.spot_direction));
+                    float epsilon = light.cutOff - light.outerCutOff;
+                    float intensity = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
 
-                    vec3 norm = normalize(oNormal);
-                    vec3 lightDir = normalize(light.position - fragPos);
-                    float diff = max(dot(norm, lightDir), 0.0);
-                    vec3 diffuse = light.diffuse * diff * vec3(texture(material.diffuse, TexCoords));
+                    if(theta > light.outerCutOff) {
+                        // ambient
+                        vec3 ambient = light.ambient * texture(material.diffuse, TexCoords).rgb;
+                        
+                        // diffuse 
+                        vec3 norm = normalize(oNormal);
+                        float diff = max(dot(norm, spot_dir), 0.0);
+                        vec3 diffuse = light.spot_diffuse * diff * texture(material.diffuse, TexCoords).rgb;
+                        diffuse *= intensity;
+                        
+                        // specular
+                        vec3 viewDir = normalize(viewPos - fragPos);
+                        vec3 reflectDir = reflect(-spot_dir, norm);  
+                        float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+                        vec3 specular = light.spot_specular * spec * texture(material.specular, TexCoords).rgb;
+                        specular *= intensity;
+                        
+                        // attenuation
+                        float distance    = length(light.spot_position - fragPos);
+                        float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));    
 
-                    vec3 viewDir = normalize(viewPos - fragPos);
-                    vec3 reflectDir = reflect(-lightDir, norm);
-                    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-                    vec3 specular = light.specular * spec * vec3(texture(material.specular, TexCoords));
+                        // ambient  *= attenuation; // remove attenuation from ambient, as otherwise at large distances the light would be darker inside than outside the spotlight due the ambient term in the else branche
+                        diffuse   *= attenuation;
+                        specular *= attenuation;
+                            
+                        vec3 result = ambient + diffuse + specular;
+                        FragColor = vec4(result, 1.0);
+                    } else {
+                        float distance = length(light.position - fragPos);
+                        float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));
 
-                    vec3 result = ambient + diffuse + specular;
+                        vec3 ambient = light.ambient * vec3(texture(material.diffuse, TexCoords));
+                        ambient *= attenuation;
+
+                        vec3 norm = normalize(oNormal);
+                        vec3 lightDir = normalize(-light.direction);
+                        float diff = max(dot(norm, lightDir), 0.0);
+                        vec3 diffuse = light.diffuse * diff * vec3(texture(material.diffuse, TexCoords));
+                        diffuse *= attenuation;
+
+                        vec3 viewDir = normalize(viewPos - fragPos);
+                        vec3 reflectDir = reflect(-lightDir, norm);
+                        float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+                        vec3 specular = light.specular * spec * vec3(texture(material.specular, TexCoords));
+                        specular *= attenuation;
+
+                        vec3 result = ambient + diffuse + specular;
         
-                    FragColor = vec4(result, 1.0);
+                        FragColor = vec4(result, 1.0);
+                    }
                 }
             ",
         }
@@ -150,6 +204,8 @@ fn main() {
         light_program, light_position, light_model);
     let light_specular = [1.0_f32, 1.0, 1.0];
 
+    let light_direction = [-0.2_f32, -1.0, -0.3];
+
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let mut camera = Camera::new(
         cgmath::Point3::new(-2_f32, 1_f32, 1_f32), 
@@ -169,9 +225,32 @@ fn main() {
         .. Default::default()
     };
 
+    let kc = 1.0_f32;
+
     let mut last_frame = time::Instant::now();
 
     let mut step = 1_f32;
+
+    // 多个正方体的位移矩阵
+    let box_trans = {
+        let mut s = Vec::<cgmath::Matrix4<f32>>::new();
+        let vecs = [
+            cgmath::Vector3::new(0.0f32,  0.0,  0.0),
+            cgmath::Vector3::new(2.0f32,  5.0, -15.0),
+            cgmath::Vector3::new(-1.5f32, -2.2, -2.5),
+            cgmath::Vector3::new(-3.8f32, -2.0, -12.3),
+            cgmath::Vector3::new(2.4f32, -0.4, -3.5),
+            cgmath::Vector3::new(-1.7f32,  3.0, -7.5),
+            cgmath::Vector3::new(1.3f32, -2.0, -2.5),
+            cgmath::Vector3::new(1.5f32,  2.0, -2.5),
+            cgmath::Vector3::new(1.5f32,  0.2, -1.5),
+            cgmath::Vector3::new(-1.3f32,  1.0, -1.5)
+        ];
+        for vec in vecs {
+            s.push(cgmath::Matrix4::from_translation(vec));
+        }
+        s
+    };
 
     // the main loop
     event_loop.run(move |event, _, control_flow| {
@@ -255,7 +334,6 @@ fn main() {
 
         
         let box_uniforms = uniform! {
-            model: Into::<[[f32; 4]; 4]>::into(box_cube.model * Matrix4::from_translation(box_cube.position.to_vec())),
             view: Into::<[[f32; 4]; 4]>::into(view_matrix),
             projection: Into::<[[f32; 4]; 4]>::into(projection_matrix),
             // color: box_cube.color,
@@ -270,6 +348,16 @@ fn main() {
         let box_uniforms = box_uniforms.add("light.diffuse", Into::<[f32; 3]>::into(light_diffuse));
         let box_uniforms = box_uniforms.add("light.specular", light_specular);
         let box_uniforms = box_uniforms.add("light.position", Into::<[f32; 3]>::into(light_position));
+        let box_uniforms = box_uniforms.add("light.direction", light_direction);
+        let box_uniforms = box_uniforms.add("light.constant", 1.0_f32);
+        let box_uniforms = box_uniforms.add("light.linear", 0.09_f32);
+        let box_uniforms = box_uniforms.add("light.quadratic", 0.032_f32);
+        let box_uniforms = box_uniforms.add("light.spot_position", Into::<[f32; 3]>::into(camera.position));
+        let box_uniforms = box_uniforms.add("light.spot_direction", Into::<[f32; 3]>::into(camera.direction()));
+        let box_uniforms = box_uniforms.add("light.cutOff", cgmath::Deg(15.0_f32).cos());
+        let box_uniforms = box_uniforms.add("light.spot_diffuse", [1.0_f32, 1.0, 1.0]);
+        let box_uniforms = box_uniforms.add("light.spot_specular", [1.0_f32, 1.0, 1.0]);
+        let box_uniforms = box_uniforms.add("light.outerCutOff", cgmath::Deg(20.0_f32).cos());
         
         let light_uniforms = uniform! {
             model: Into::<[[f32; 4]; 4]>::into(light_cube.model * Matrix4::from_translation(light_cube.position.to_vec())),
@@ -278,7 +366,12 @@ fn main() {
             color: light_cube.color,
         };
         
-        target.draw(&box_cube.vertex_buffer, &box_cube.index_buffer, &box_cube.program, &box_uniforms, &draw_parameters).unwrap();
+        let axis = cgmath::Vector3::new(1.0_f32, 0.3, 0.5).normalize();
+        for (i, box_tran) in box_trans.iter().enumerate() {
+            let angle = 20.0f32 * i as f32;
+            let box_uniforms = box_uniforms.add("model", Into::<[[f32; 4]; 4]>::into(Matrix4::from_axis_angle(axis, cgmath::Deg(angle)) * box_tran));
+            target.draw(&box_cube.vertex_buffer, &box_cube.index_buffer, &box_cube.program, &box_uniforms, &draw_parameters).unwrap();
+        }
         
         target.draw(&light_cube.vertex_buffer, &light_cube.index_buffer, &light_cube.program, &light_uniforms, &draw_parameters).unwrap();
 

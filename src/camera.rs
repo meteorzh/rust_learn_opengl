@@ -44,6 +44,14 @@ impl Camera {
             Vector3::unit_y(),
         )
     }
+
+    pub fn direction(&self) -> Vector3<f32> {
+        Vector3::new(
+            self.yaw.0.cos(),
+            self.pitch.0.sin(),
+            self.yaw.0.sin(),
+        ).normalize()
+    }
 }
 
 
