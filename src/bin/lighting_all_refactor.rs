@@ -124,12 +124,12 @@ fn main() {
                     vec3 viewDir = normalize(viewPos - FragPos);
 
                     // 第一阶段：定向光照
-                    // vec3 result = CalcDirLight(dirLight, norm, viewDir);
+                    vec3 result = CalcDirLight(dirLight, norm, viewDir);
                     // 第二阶段：点光源
-                    // for(int i = 0; i < NR_POINT_LIGHTS; i++)
-                        // result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
+                    for(int i = 0; i < NR_POINT_LIGHTS; i++)
+                        result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
                     // 第三阶段：聚光
-                    vec3 result = CalcSpotLight(spotLight, norm, FragPos, viewDir);
+                    result += CalcSpotLight(spotLight, norm, FragPos, viewDir);
 
                     FragColor = vec4(result, 1.0);
                 }
@@ -415,61 +415,20 @@ fn main() {
         }
         
         let mut box_uniforms = DynamicUniforms::new();
-        box_uniforms.add("view", &view_matrix);
-        box_uniforms.add("projection", &projection_matrix);
-        box_uniforms.add("viewPos", &camera_position);
+        box_uniforms.add(String::from("view"), &view_matrix);
+        box_uniforms.add(String::from("projection"), &projection_matrix);
+        box_uniforms.add(String::from("viewPos"), &camera_position);
         
-        box_uniforms.add("dirLight.direction", &dir_light.direction);
-        box_uniforms.add("dirLight.ambient", &dir_light.ambient);
-        box_uniforms.add("dirLight.diffuse", &dir_light.diffuse);
-        box_uniforms.add("dirLight.specular", &dir_light.specular);
+        dir_light.add_to_uniforms("dirLight", &mut box_uniforms);
 
-        box_uniforms.add("pointLights[0].position", &point_lights[0].position);
-        box_uniforms.add("pointLights[0].constant", &point_lights[0].constant);
-        box_uniforms.add("pointLights[0].linear", &point_lights[0].linear);
-        box_uniforms.add("pointLights[0].quadratic", &point_lights[0].quadratic);
-        box_uniforms.add("pointLights[0].ambient", &point_lights[0].ambient);
-        box_uniforms.add("pointLights[0].diffuse", &point_lights[0].diffuse);
-        box_uniforms.add("pointLights[0].specular", &point_lights[0].specular);
+        for (i, point_light) in point_lights.iter().enumerate() {
+            let light_key = format!("pointLights[{}]", i);
+            point_light.add_to_uniforms(light_key.as_str(), &mut box_uniforms);
+        }
 
-        box_uniforms.add("pointLights[1].position", &point_lights[1].position);
-        box_uniforms.add("pointLights[1].constant", &point_lights[1].constant);
-        box_uniforms.add("pointLights[1].linear", &point_lights[1].linear);
-        box_uniforms.add("pointLights[1].quadratic", &point_lights[1].quadratic);
-        box_uniforms.add("pointLights[1].ambient", &point_lights[1].ambient);
-        box_uniforms.add("pointLights[1].diffuse", &point_lights[1].diffuse);
-        box_uniforms.add("pointLights[1].specular", &point_lights[1].specular);
+        spot_light.add_to_uniforms("spotLight", &mut box_uniforms);
 
-        box_uniforms.add("pointLights[2].position", &point_lights[2].position);
-        box_uniforms.add("pointLights[2].constant", &point_lights[2].constant);
-        box_uniforms.add("pointLights[2].linear", &point_lights[2].linear);
-        box_uniforms.add("pointLights[2].quadratic", &point_lights[2].quadratic);
-        box_uniforms.add("pointLights[2].ambient", &point_lights[2].ambient);
-        box_uniforms.add("pointLights[2].diffuse", &point_lights[2].diffuse);
-        box_uniforms.add("pointLights[2].specular", &point_lights[2].specular);
-
-        box_uniforms.add("pointLights[3].position", &point_lights[3].position);
-        box_uniforms.add("pointLights[3].constant", &point_lights[3].constant);
-        box_uniforms.add("pointLights[3].linear", &point_lights[3].linear);
-        box_uniforms.add("pointLights[3].quadratic", &point_lights[3].quadratic);
-        box_uniforms.add("pointLights[3].ambient", &point_lights[3].ambient);
-        box_uniforms.add("pointLights[3].diffuse", &point_lights[3].diffuse);
-        box_uniforms.add("pointLights[3].specular", &point_lights[3].specular);
-
-        box_uniforms.add("material.diffuse", &box_material.diffuse);
-        box_uniforms.add("material.specular", &box_material.specular);
-        box_uniforms.add("material.shininess", &box_material.shininess);
-
-        box_uniforms.add("spotLight.direction", &spot_light.direction);
-        box_uniforms.add("spotLight.position", &spot_light.position);
-        box_uniforms.add("spotLight.cutOff", &spot_light.cut_off);
-        box_uniforms.add("spotLight.outerCutOff", &spot_light.outer_cut_off);
-        box_uniforms.add("spotLight.constant", &spot_light.constant);
-        box_uniforms.add("spotLight.linear", &spot_light.linear);
-        box_uniforms.add("spotLight.quadratic", &spot_light.quadratic);
-        box_uniforms.add("spotLight.ambient", &spot_light.ambient);
-        box_uniforms.add("spotLight.diffuse", &spot_light.diffuse);
-        box_uniforms.add("spotLight.specular", &spot_light.specular);
+        box_material.add_to_uniforms("material", &mut box_uniforms);
         
         let axis = cgmath::Vector3::new(1.0_f32, 0.3, 0.5).normalize();
         let mut models = Vec::with_capacity(box_cubes.len());
@@ -477,7 +436,7 @@ fn main() {
             models.push(Into::<[[f32; 4]; 4]>::into(Matrix4::from_translation(box_cube.position.to_vec()) * Matrix4::from_axis_angle(axis, cgmath::Deg(box_angle))));
         }
         for (i, box_cube) in box_cubes.iter().enumerate() {
-            box_uniforms.add("model", &models[i]);
+            box_uniforms.add(String::from("model"), &models[i]);
             target.draw(&box_cube.vertex_buffer, &box_cube.index_buffer, &box_program, &box_uniforms, &draw_parameters).unwrap();
         }
         
@@ -609,6 +568,14 @@ impl Cube {
 }
 
 
+
+pub fn add_to_uniforms<'a: 'b, 'b>(key_prefix: &str, key_suffix: &str, value: &'a dyn AsUniformValue, uniforms: &'b mut DynamicUniforms<'a>) {
+    let mut key = String::from(key_prefix);
+    key.push_str(key_suffix);
+    uniforms.add(key, value);
+}
+
+
 pub struct Material {
     diffuse: CompressedSrgbTexture2d,
     specular: CompressedSrgbTexture2d,
@@ -623,12 +590,14 @@ impl Material {
             shininess: shininess
         }
     }
+
+    pub fn add_to_uniforms<'a: 'b, 'b>(&'a self, key: &str, uniforms: &'b mut DynamicUniforms<'a>) {
+        add_to_uniforms(key, ".diffuse", &self.diffuse, uniforms);
+        add_to_uniforms(key, ".specular", &self.specular, uniforms);
+        add_to_uniforms(key, ".shininess", &self.shininess, uniforms);
+    }
 }
 
-
-fn build_name<'a>(variable_name: &'a str, name: &'a str) -> String {
-    variable_name.to_string().add(".").add(name)
-}
 
 
 /**
@@ -646,6 +615,13 @@ impl DirLight {
 
     pub fn new(direction: [f32; 3], ambient: [f32; 3], diffuse: [f32; 3], specular: [f32; 3],) -> DirLight {
         DirLight { direction: direction, ambient: ambient, diffuse: diffuse, specular: specular }
+    }
+
+    pub fn add_to_uniforms<'a: 'b, 'b>(&'a self, light_key: &str, uniforms: &'b mut DynamicUniforms<'a>) {
+        add_to_uniforms(light_key, ".direction", &self.direction, uniforms);
+        add_to_uniforms(light_key, ".ambient", &self.ambient, uniforms);
+        add_to_uniforms(light_key, ".diffuse", &self.diffuse, uniforms);
+        add_to_uniforms(light_key, ".specular", &self.specular, uniforms);
     }
 }
 
@@ -677,6 +653,16 @@ impl PointLight {
             specular: specular,
         }
     }
+
+    pub fn add_to_uniforms<'a: 'b, 'b>(&'a self, light_key: &str, uniforms: &'b mut DynamicUniforms<'a>) {
+        add_to_uniforms(light_key, ".position", &self.position, uniforms);
+        add_to_uniforms(light_key, ".constant", &self.constant, uniforms);
+        add_to_uniforms(light_key, ".linear", &self.linear, uniforms);
+        add_to_uniforms(light_key, ".quadratic", &self.quadratic, uniforms);
+        add_to_uniforms(light_key, ".ambient", &self.ambient, uniforms);
+        add_to_uniforms(light_key, ".diffuse", &self.diffuse, uniforms);
+        add_to_uniforms(light_key, ".specular", &self.specular, uniforms);
+    }
 }
 
 /**
@@ -693,6 +679,22 @@ struct SpotLight {
     ambient: [f32; 3],
     diffuse: [f32; 3],
     specular: [f32; 3],
+}
+
+impl SpotLight {
+    
+    pub fn add_to_uniforms<'a: 'b, 'b>(&'a self, light_key: &str, uniforms: &'b mut DynamicUniforms<'a>) {
+        add_to_uniforms(light_key, ".position", &self.position, uniforms);
+        add_to_uniforms(light_key, ".direction", &self.direction, uniforms);
+        add_to_uniforms(light_key, ".cutOff", &self.cut_off, uniforms);
+        add_to_uniforms(light_key, ".outerCutOff", &self.outer_cut_off, uniforms);
+        add_to_uniforms(light_key, ".constant", &self.constant, uniforms);
+        add_to_uniforms(light_key, ".linear", &self.linear, uniforms);
+        add_to_uniforms(light_key, ".quadratic", &self.quadratic, uniforms);
+        add_to_uniforms(light_key, ".ambient", &self.ambient, uniforms);
+        add_to_uniforms(light_key, ".diffuse", &self.diffuse, uniforms);
+        add_to_uniforms(light_key, ".specular", &self.specular, uniforms);
+    }
 }
 
 
@@ -715,11 +717,11 @@ macro_rules! dynamic_uniform{
 }
 
 #[derive(Clone)]
-pub struct DynamicUniforms<'a, 's>{
-    map: HashMap<&'s str, UniformValue<'a>>,
+pub struct DynamicUniforms<'a>{
+    map: HashMap<String, UniformValue<'a>>,
 }
 
-impl<'a, 's> DynamicUniforms<'a, 's>{
+impl<'a> DynamicUniforms<'a>{
     /// Creates new DynamicUniforms
     pub fn new() -> Self{
         Self{
@@ -729,12 +731,12 @@ impl<'a, 's> DynamicUniforms<'a, 's>{
 
     /// Add a value to the DynamicUniforms
     #[inline]
-    pub fn add(&mut self, key: &'s str, value: &'a dyn AsUniformValue){
+    pub fn add(&mut self, key: String, value: &'a dyn AsUniformValue){
         self.map.insert(key, value.as_uniform_value());
     }
 }
 
-impl Uniforms for DynamicUniforms<'_, '_>{
+impl Uniforms for DynamicUniforms<'_>{
     fn visit_values<'a, F: FnMut(&str, UniformValue<'a>)>(&'a self, mut output: F) {
         for (key, value) in self.map.iter(){
             output(key, *value);
