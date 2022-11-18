@@ -126,10 +126,10 @@ fn main() {
                     // 第一阶段：定向光照
                     vec3 result = CalcDirLight(dirLight, norm, viewDir);
                     // 第二阶段：点光源
-                    for(int i = 0; i < NR_POINT_LIGHTS; i++)
-                        result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
+                    // for(int i = 0; i < NR_POINT_LIGHTS; i++)
+                    //     result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
                     // 第三阶段：聚光
-                    result += CalcSpotLight(spotLight, norm, FragPos, viewDir);
+                    // result += CalcSpotLight(spotLight, norm, FragPos, viewDir);
 
                     FragColor = vec4(result, 1.0);
                 }

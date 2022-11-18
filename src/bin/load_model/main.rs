@@ -24,48 +24,48 @@ fn main() {
     display.gl_window().window().set_cursor_visible(false);
 
     // 物体着色器程序
-    let obj_program = create_program("src/bin/load_model/obj_shader_test.vert", "src/bin/load_model/obj_shader_test.frag", &display);
+    let obj_program = create_program("src/bin/load_model/obj_shader.vert", "src/bin/load_model/obj_shader.frag", &display);
 
     // 光源着色器程序
-    // let light_program = create_program("src/bin/load_model/light_shader.vert", "src/bin/load_model/light_shader.frag", &display);
+    let light_program = create_program("src/bin/load_model/light_shader.vert", "src/bin/load_model/light_shader.frag", &display);
 
     let models = load_wavefront_obj_as_models(&display, "src/nanosuit/", "nanosuit.obj");
 
     // 定向光
-    // let dir_light = DirLight::new(
-    //     [-0.2_f32, -1.0, -0.3],
-    //     [0.2_f32, 0.2, 0.2],
-    //     [0.5_f32, 0.5, 0.5],
-    //     [1.0_f32, 1.0, 1.0]
-    // );
+    let dir_light = DirLight::new(
+        [-0.2_f32, -1.0, -0.3],
+        [0.05_f32, 0.05, 0.05],
+        [0.4_f32, 0.4, 0.4],
+        [0.5_f32, 0.5, 0.5]
+    );
 
     // 点光源
-    // let (point_light_boxes, point_lights) = {
-    //     let positions = [
-    //         [0.7_f32, 0.2, 2.0],
-    //         // [2.3_f32, -3.3, -4.0],
-    //         // [-4.0_f32, 2.0, -12.0],
-    //         // [0.0_f32, 0.0, -3.0]
-    //     ];
+    let (point_light_boxes, point_lights) = {
+        let positions = [
+            [0.7_f32, 0.2, 2.0],
+            // [2.3_f32, -3.3, -4.0],
+            // [-4.0_f32, 2.0, -12.0],
+            // [0.0_f32, 0.0, -3.0]
+        ];
 
-    //     let mut light_boxes = Vec::<Cube>::with_capacity(4);
-    //     let mut point_lights = Vec::<PointLight>::with_capacity(4);
-    //     let light_color = [1.0_f32, 1.0, 1.0];
-    //     for position in positions {
-    //         light_boxes.push(Cube::new("light", 0.1_f32, &display, light_color, Point3::from(position), Matrix4::<f32>::identity()));
-    //         point_lights.push(PointLight::new(
-    //             position, 
-    //             1.0_f32, 
-    //             0.09_f32, 
-    //             0.032_f32, 
-    //             [0.05_f32, 0.05, 0.05], 
-    //             [0.8_f32, 0.8, 0.8], 
-    //             [1.0_f32, 1.0, 1.0]
-    //         ));
-    //     }
+        let mut light_boxes = Vec::<Cube>::with_capacity(4);
+        let mut point_lights = Vec::<PointLight>::with_capacity(4);
+        let light_color = [1.0_f32, 1.0, 1.0];
+        for position in positions {
+            light_boxes.push(Cube::new("light", 0.1_f32, &display, light_color, Point3::from(position), Matrix4::<f32>::identity()));
+            point_lights.push(PointLight::new(
+                position, 
+                1.0_f32, 
+                0.09_f32, 
+                0.032_f32, 
+                [0.05_f32, 0.05, 0.05], 
+                [0.8_f32, 0.8, 0.8], 
+                [1.0_f32, 1.0, 1.0]
+            ));
+        }
 
-    //     (light_boxes, point_lights)
-    // };
+        (light_boxes, point_lights)
+    };
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let mut camera = Camera::new(
@@ -156,18 +156,18 @@ fn main() {
         let camera_position = Into::<[f32; 3]>::into(camera.position);
 
         // 聚光灯
-        // let spot_light = SpotLight::new(
-        //     camera_position,
-        //     Into::<[f32; 3]>::into(camera.direction()),
-        //     cgmath::Deg(12.5_f32).cos(),
-        //     cgmath::Deg(15.0_f32).cos(),
-        //     1.0_f32,
-        //     0.09_f32,
-        //     0.032_f32,
-        //     [0.0_f32, 0.0, 0.0],
-        //     [1.0_f32, 1.0, 1.0],
-        //     [1.0_f32, 1.0, 1.0],
-        // );
+        let spot_light = SpotLight::new(
+            camera_position,
+            Into::<[f32; 3]>::into(camera.direction()),
+            cgmath::Deg(12.5_f32).cos(),
+            cgmath::Deg(15.0_f32).cos(),
+            1.0_f32,
+            0.09_f32,
+            0.032_f32,
+            [0.0_f32, 0.0, 0.0],
+            [1.0_f32, 1.0, 1.0],
+            [1.0_f32, 1.0, 1.0],
+        );
 
         // drawing a frame
         let mut target = display.draw();
@@ -179,44 +179,42 @@ fn main() {
         box_uniforms.add(String::from("projection"), &projection_matrix);
         box_uniforms.add(String::from("viewPos"), &camera_position);
 
-        let mut model = Matrix4::identity();
-        model = model * Matrix4::from_translation(Vector3::zero());
-        model = model * Matrix4::from_scale(1.0_f32);
+        let model = Matrix4::identity();
+        // model = model * Matrix4::from_translation(Vector3::zero());
+        // model = model * Matrix4::from_scale(1.0_f32);
         let model = Into::<[[f32; 4]; 4]>::into(model);
         box_uniforms.add(String::from("model"), &model);
         
         // 定向光写入uniforms
-        // dir_light.add_to_uniforms("dirLight", &mut box_uniforms);
+        dir_light.add_to_uniforms("dirLight", &mut box_uniforms);
 
         // 点光源写入uniforms
-        // for (i, point_light) in point_lights.iter().enumerate() {
-        //     let light_key = format!("pointLights[{}]", i);
-        //     point_light.add_to_uniforms(light_key.as_str(), &mut box_uniforms);
-        // }
+        for (i, point_light) in point_lights.iter().enumerate() {
+            let light_key = format!("pointLights[{}]", i);
+            point_light.add_to_uniforms(light_key.as_str(), &mut box_uniforms);
+        }
 
         // 聚光灯写入uniforms
-        // spot_light.add_to_uniforms("spotLight", &mut box_uniforms);
+        spot_light.add_to_uniforms("spotLight", &mut box_uniforms);
         
         // 循环渲染模型
         for model in models.iter() {
             let mut uniforms = box_uniforms.clone();
             if let Some(material) = &model.material {
-                if let Some(diffuse_map) = &material.diffuse_map {
-                    uniforms.add(String::from("texture_diffuse1"), diffuse_map.as_ref());
-                }
+                material.add_to_uniforms("material", &mut uniforms);
             }
             target.draw(&model.vertex_buffer, &model.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
         }
         
-        // for (_, light) in point_light_boxes.iter().enumerate() {
-        //     let uniforms = uniform! {
-        //         model: Into::<[[f32; 4]; 4]>::into(light.model * Matrix4::from_translation(light.position.to_vec())),
-        //         view: Into::<[[f32; 4]; 4]>::into(view_matrix),
-        //         projection: Into::<[[f32; 4]; 4]>::into(projection_matrix),
-        //         color: light.color,
-        //     };
-        //     // target.draw(&light.vertex_buffer, &light.index_buffer, &light_program, &uniforms, &draw_parameters).unwrap();
-        // }
+        for (_, light) in point_light_boxes.iter().enumerate() {
+            let uniforms = uniform! {
+                model: Into::<[[f32; 4]; 4]>::into(light.model * Matrix4::from_translation(light.position.to_vec())),
+                view: Into::<[[f32; 4]; 4]>::into(view_matrix),
+                projection: Into::<[[f32; 4]; 4]>::into(projection_matrix),
+                color: light.color,
+            };
+            target.draw(&light.vertex_buffer, &light.index_buffer, &light_program, &uniforms, &draw_parameters).unwrap();
+        }
 
         target.finish().unwrap();
     });
