@@ -42,7 +42,7 @@ fn main() {
     // 点光源
     let (point_light_boxes, point_lights) = {
         let positions = [
-            [0.7_f32, 0.2, 2.0],
+            [0_f32, 10.0, 7.0],
             // [2.3_f32, -3.3, -4.0],
             // [-4.0_f32, 2.0, -12.0],
             // [0.0_f32, 0.0, -3.0]
@@ -52,7 +52,7 @@ fn main() {
         let mut point_lights = Vec::<PointLight>::with_capacity(4);
         let light_color = [1.0_f32, 1.0, 1.0];
         for position in positions {
-            light_boxes.push(Cube::new("light", 0.1_f32, &display, light_color, Point3::from(position), Matrix4::<f32>::identity()));
+            light_boxes.push(Cube::new("light", 0.7_f32, &display, light_color, Point3::from(position), Matrix4::<f32>::identity()));
             point_lights.push(PointLight::new(
                 position, 
                 1.0_f32, 
@@ -69,8 +69,8 @@ fn main() {
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let mut camera = Camera::new(
-        cgmath::Point3::new(-2_f32, 1_f32, 1_f32), 
-        cgmath::Rad::from(cgmath::Deg(0_f32)), 
+        cgmath::Point3::new(0_f32, 13_f32, 10_f32), 
+        cgmath::Rad::from(cgmath::Deg(-90_f32)), 
         cgmath::Rad::from(cgmath::Deg(0_f32))
     );
     let mut controller = CameraController::new(1_f32, 0.5_f32);

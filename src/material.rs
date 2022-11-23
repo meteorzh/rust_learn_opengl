@@ -1,6 +1,8 @@
-use std::rc::Rc;
+use std::{rc::Rc, collections::HashMap, sync::Arc, io::Cursor, fs, future, process::Output};
 
-use glium::texture::CompressedSrgbTexture2d;
+use futures::{executor::{block_on, ThreadPool, ThreadPoolBuilder}, Future};
+use glium::{texture::CompressedSrgbTexture2d, Display};
+use obj::Mtl;
 
 use crate::uniforms::{DynamicUniforms, add_to_uniforms};
 
@@ -65,4 +67,144 @@ impl Material {
             add_to_uniforms(key, ".shininess", shininess, uniforms);
         }
     }
+}
+
+
+
+pub struct MaterialLoader {
+    cache: HashMap<String, Rc<Material>>,
+    map_cache: HashMap<String, Rc<CompressedSrgbTexture2d>>,
+    pool: ThreadPool,
+}
+
+impl MaterialLoader {
+    
+    pub fn new() -> MaterialLoader {
+        MaterialLoader { cache: HashMap::new(), map_cache: HashMap::new(), pool: ThreadPoolBuilder::new().name_prefix("material-loader").create().unwrap() }
+    }
+
+    pub fn parse_and_load(&mut self, mtls: &Vec<Mtl>, basepath: &str, display: &Display) {
+        let mut texture_paths = HashMap::new();
+        for mtl in mtls.iter() {
+            println!("材质文件{}中有{}个材质需要加载...", mtl.filename, mtl.materials.len());
+            // let mut futures = Vec::with_capacity(mtl.materials.len());
+            for material in mtl.materials.iter() {
+                let paths = Self::parse_valid_texture_paths(basepath, material);
+                for path in paths.into_iter() {
+                    texture_paths.insert(path, 0);
+                }
+            }
+        }
+        // 加载图片, 异步加载
+        let fts = {
+            let mut futures = Vec::with_capacity(texture_paths.len());
+            for path in texture_paths.keys().into_iter() {
+                futures.push(load_texture_async(path.clone(), display));
+            }
+            futures
+        };
+        println!("开始加载材质图片");
+        let textures = block_on(futures::future::join_all(fts));
+        println!("材质图片加载完成");
+        for texture in textures.into_iter() {
+            self.map_cache.insert(texture.0, Rc::new(texture.1));
+        }
+
+        for mtl in mtls.iter() {
+            // let mut futures = Vec::with_capacity(mtl.materials.len());
+            for material in mtl.materials.iter() {
+                self.load(material, basepath);
+            }
+        }
+    }
+
+    fn load(&mut self, obj_material: &Arc<obj::Material>, basepath: &str) {
+        let name = obj_material.name.clone();
+        if self.cache.contains_key(&name) {
+            return;
+        }
+
+        let material = Material {
+            ambient: obj_material.ka,
+            diffuse: obj_material.kd,
+            specular: obj_material.ks,
+            emissive: obj_material.ke,
+            transmission_filter: obj_material.tf,
+            shininess: obj_material.ns,
+            illumination_model: obj_material.illum,
+            dissolve: obj_material.d,
+            specular_exponent: None,
+            optical_density: obj_material.ni,
+            ambient_map: self.find_2d_texture(&obj_material.map_ka, basepath),
+            diffuse_map: self.find_2d_texture(&obj_material.map_kd, basepath),
+            specular_map: self.find_2d_texture(&obj_material.map_ks, basepath),
+            emissive_map: self.find_2d_texture(&obj_material.map_ke, basepath),
+            dissolve_map: self.find_2d_texture(&obj_material.map_d, basepath),
+            bump_map: self.find_2d_texture(&obj_material.map_bump, basepath),
+        };
+        self.cache.insert(name, Rc::new(material));
+    }
+
+    fn find_2d_texture(&self, file: &Option<String>, basepath: &str) -> Option<Rc<CompressedSrgbTexture2d>> {
+        if let Some(file) = file {
+            let mut path = basepath.to_string();
+            path.push_str(file.as_str());
+            
+            if let Some(texture) = self.map_cache.get(&path) {
+                return Some(Rc::clone(texture));
+            }
+        }
+        None
+    }
+
+    pub fn find_in_cache(&self, name: String) -> Option<Rc<Material>> {
+        match self.cache.get(&name) {
+            Some(material) => {
+                Some(Rc::clone(material))
+            },
+            None => None,
+        }
+    }
+
+    fn parse_valid_texture_paths(basepath: &str, material: &Arc<obj::Material>) -> Vec<String> {
+        let mut result = Vec::new();
+        Self::add_to_vec(&mut result, &material.map_ka, basepath);
+        Self::add_to_vec(&mut result, &material.map_kd, basepath);
+        Self::add_to_vec(&mut result, &material.map_ks, basepath);
+        Self::add_to_vec(&mut result, &material.map_ke, basepath);
+        Self::add_to_vec(&mut result, &material.map_d, basepath);
+        Self::add_to_vec(&mut result, &material.map_bump, basepath);
+
+        result
+    }
+
+    fn add_to_vec(list: &mut Vec<String>, value: &Option<String>, basepath: &str) {
+        if let Some(file) = value {
+            let mut str = basepath.to_string();
+            str.push_str(file.as_str());
+            list.push(str);
+        }
+    }
+    
+}
+
+pub async fn load_texture_async(path: String, display: &Display) -> (String, CompressedSrgbTexture2d) {
+    load_texture(path, display)
+}
+
+pub fn load_texture(path: String, display: &Display) -> (String, CompressedSrgbTexture2d) {
+    println!("加载材质图片: {}", path);
+    let format = {
+        if path.ends_with(".png") {
+            image::ImageFormat::Png
+        } else if path.ends_with(".jpg") {
+            image::ImageFormat::Jpeg
+        } else {
+            panic!("不支持的图片格式");
+        }
+    };
+    let image = image::load(Cursor::new(fs::read(path.as_str()).unwrap()), format).unwrap().to_rgba8();
+    let image_dimensions = image.dimensions();
+    let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
+    (path, glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap())
 }

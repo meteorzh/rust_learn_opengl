@@ -1,8 +1,8 @@
-use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}};
+use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}, future};
 
 use cgmath::{Vector3, Zero, Vector2};
-use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, texture::CompressedSrgbTexture2d};
-use material::Material;
+use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, texture::CompressedSrgbTexture2d, program::{SourceCode, ProgramCreationInput}, Program};
+use material::{Material, MaterialLoader};
 use obj::{ObjData, ObjMaterial};
 
 pub mod utils;
@@ -10,6 +10,7 @@ pub mod camera;
 pub mod lights;
 pub mod uniforms;
 pub mod material;
+pub mod objects;
 
 
 #[derive(Copy, Clone)]
@@ -41,12 +42,7 @@ pub fn load_wavefront_obj_as_models(display: &Display, basepath: &str, obj_file:
 
     // 加载材质
     let mut material_loader = MaterialLoader::new();
-    for mtl in data.material_libs.iter() {
-        println!("材质文件{}中有{}个材质需要加载...", mtl.filename, mtl.materials.len());
-        for material in mtl.materials.iter() {
-            material_loader.load(material, basepath, display);
-        }
-    }
+    material_loader.parse_and_load(&data.material_libs, basepath, display);
 
     let mut models = Vec::new();
     for obj in data.objects.iter() {
@@ -109,76 +105,93 @@ pub fn load_wavefront_obj_as_models(display: &Display, basepath: &str, obj_file:
 
 
 
-struct MaterialLoader {
-    cache: HashMap<String, Rc<Material>>,
-    map_cache: HashMap<String, Rc<CompressedSrgbTexture2d>>,
-}
+// struct MaterialLoader {
+//     cache: HashMap<String, Rc<Material>>,
+//     map_cache: HashMap<String, Rc<CompressedSrgbTexture2d>>,
+// }
 
-impl MaterialLoader {
+// impl MaterialLoader {
     
-    fn new() -> MaterialLoader {
-        MaterialLoader { cache: HashMap::new(), map_cache: HashMap::new() }
-    }
+//     fn new() -> MaterialLoader {
+//         MaterialLoader { cache: HashMap::new(), map_cache: HashMap::new() }
+//     }
 
-    fn load(&mut self, obj_material: &Arc<obj::Material>, basepath: &str, display: &Display) {
-        let name = obj_material.name.clone();
-        if self.cache.contains_key(&name) {
-            return;
-        }
+//     fn load(&mut self, obj_material: &Arc<obj::Material>, basepath: &str, display: &Display) {
+//         let name = obj_material.name.clone();
+//         if self.cache.contains_key(&name) {
+//             return;
+//         }
 
-        let material = Material {
-            ambient: obj_material.ka,
-            diffuse: obj_material.kd,
-            specular: obj_material.ks,
-            emissive: obj_material.ke,
-            transmission_filter: obj_material.tf,
-            shininess: obj_material.ns,
-            illumination_model: obj_material.illum,
-            dissolve: obj_material.d,
-            specular_exponent: None,
-            optical_density: obj_material.ni,
-            ambient_map: self.parse_2d_texture(&obj_material.map_ka, basepath, display),
-            diffuse_map: self.parse_2d_texture(&obj_material.map_kd, basepath, display),
-            specular_map: self.parse_2d_texture(&obj_material.map_ks, basepath, display),
-            emissive_map: self.parse_2d_texture(&obj_material.map_ke, basepath, display),
-            dissolve_map: self.parse_2d_texture(&obj_material.map_d, basepath, display),
-            bump_map: self.parse_2d_texture(&obj_material.map_bump, basepath, display),
-        };
-        self.cache.insert(name, Rc::new(material));
-    }
+//         let material = Material {
+//             ambient: obj_material.ka,
+//             diffuse: obj_material.kd,
+//             specular: obj_material.ks,
+//             emissive: obj_material.ke,
+//             transmission_filter: obj_material.tf,
+//             shininess: obj_material.ns,
+//             illumination_model: obj_material.illum,
+//             dissolve: obj_material.d,
+//             specular_exponent: None,
+//             optical_density: obj_material.ni,
+//             ambient_map: self.parse_2d_texture(&obj_material.map_ka, basepath, display),
+//             diffuse_map: self.parse_2d_texture(&obj_material.map_kd, basepath, display),
+//             specular_map: self.parse_2d_texture(&obj_material.map_ks, basepath, display),
+//             emissive_map: self.parse_2d_texture(&obj_material.map_ke, basepath, display),
+//             dissolve_map: self.parse_2d_texture(&obj_material.map_d, basepath, display),
+//             bump_map: self.parse_2d_texture(&obj_material.map_bump, basepath, display),
+//         };
+//         self.cache.insert(name, Rc::new(material));
+//     }
 
-    fn parse_2d_texture(&mut self, file: &Option<String>, basepath: &str, display: &Display) -> Option<Rc<CompressedSrgbTexture2d>> {
-        match file {
-            Some(file) => {
-                let mut path = String::from(basepath);
-                path.push_str(file.as_str());
-                // 现在缓存中找
-                match self.map_cache.get(&path) {
-                    Some(texture_2d) => return Some(Rc::clone(texture_2d)),
-                    None => (),
-                };
+//     fn parse_2d_texture(&mut self, file: &Option<String>, basepath: &str, display: &Display) -> Option<Rc<CompressedSrgbTexture2d>> {
+//         match file {
+//             Some(file) => {
+//                 let mut path = String::from(basepath);
+//                 path.push_str(file.as_str());
+//                 // 现在缓存中找
+//                 match self.map_cache.get(&path) {
+//                     Some(texture_2d) => return Some(Rc::clone(texture_2d)),
+//                     None => (),
+//                 };
 
-                let image = image::load(Cursor::new(fs::read(path.as_str()).unwrap()), image::ImageFormat::Png).unwrap().to_rgba8();
-                let image_dimensions = image.dimensions();
-                let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
-                let opengl_texture = glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap();
+//                 let image = image::load(Cursor::new(fs::read(path.as_str()).unwrap()), image::ImageFormat::Png).unwrap().to_rgba8();
+//                 let image_dimensions = image.dimensions();
+//                 let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
+//                 let opengl_texture = glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap();
 
-                let texture_map = Rc::new(opengl_texture);
-                let result = Rc::clone(&texture_map);
-                self.map_cache.insert(path, texture_map);
+//                 let texture_map = Rc::new(opengl_texture);
+//                 let result = Rc::clone(&texture_map);
+//                 self.map_cache.insert(path, texture_map);
                 
-                Some(result)
-            },
-            None => None,
-        }
-    }
+//                 Some(result)
+//             },
+//             None => None,
+//         }
+//     }
 
-    fn find_in_cache(&self, name: String) -> Option<Rc<Material>> {
-        match self.cache.get(&name) {
-            Some(material) => {
-                Some(Rc::clone(material))
-            },
-            None => None,
-        }
-    }
+//     fn find_in_cache(&self, name: String) -> Option<Rc<Material>> {
+//         match self.cache.get(&name) {
+//             Some(material) => {
+//                 Some(Rc::clone(material))
+//             },
+//             None => None,
+//         }
+//     }
+// }
+
+pub fn create_program(vert_source_path: &str, frag_source_path: &str, display: &Display) -> Program {
+    let obj_vert_source = fs::read_to_string(vert_source_path).unwrap();
+    let obj_frag_source = fs::read_to_string(frag_source_path).unwrap();
+    let obj_shader_source = SourceCode {
+        vertex_shader: obj_vert_source.as_str(),
+        tessellation_control_shader: None,
+        tessellation_evaluation_shader: None,
+        geometry_shader: None,
+        fragment_shader: obj_frag_source.as_str(),
+    };
+
+    glium::Program::new(
+        display,
+        ProgramCreationInput::from(obj_shader_source)
+    ).unwrap()
 }
