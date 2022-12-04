@@ -1,4 +1,4 @@
-use cgmath::{Point3, Matrix4, Vector3, Transform};
+use cgmath::{Point3, Matrix4, Vector3, Transform, SquareMatrix};
 use glium::{VertexBuffer, IndexBuffer, index::PrimitiveType};
 
 use crate::Vertex;
@@ -142,6 +142,26 @@ impl Plane {
             index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 1, 2, 3]).unwrap(),
             position: position,
             model: model,
+        }
+    }
+
+    // 以原点为中心创建2d平面
+    pub fn new_2d_plane(id: &str, height: f32, width: f32, display: &glium::Display) -> Plane {
+        let x = width / 2.0_f32;
+        let y = height / 2.0_f32;
+        Plane {
+            id: id.to_string(),
+            vertex_buffer: glium::VertexBuffer::new(display, &[
+                Vertex { position: [-x, y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [0.0_f32, 1.0] },
+                Vertex { position: [-x, -y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [0.0_f32, 0.0] },
+                Vertex { position: [x, -y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-x, y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [0.0_f32, 1.0] },
+                Vertex { position: [x, -y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 0.0] },
+                Vertex { position: [x, y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 1.0] },
+            ]).unwrap(),
+            index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 3, 4, 5]).unwrap(),
+            position: Point3 { x: 0.0_f32, y: 0.0, z: 0.0 },
+            model: Matrix4::identity(),
         }
     }
 }

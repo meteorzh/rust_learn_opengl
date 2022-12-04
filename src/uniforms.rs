@@ -43,6 +43,12 @@ impl<'a> DynamicUniforms<'a>{
     pub fn add_str_key(&mut self, key: &str, value: &'a dyn AsUniformValue) {
         self.map.insert(String::from(key), value.as_uniform_value());
     }
+
+    /// Add a value to the DynamicUniforms
+    #[inline]
+    pub fn add_str_key_value(&mut self, key: &str, value: UniformValue<'a>) {
+        self.map.insert(String::from(key), value);
+    }
 }
 
 impl Uniforms for DynamicUniforms<'_>{
