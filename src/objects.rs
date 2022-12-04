@@ -1,4 +1,4 @@
-use cgmath::{Point3, Matrix4, Vector3};
+use cgmath::{Point3, Matrix4, Vector3, Transform};
 use glium::{VertexBuffer, IndexBuffer, index::PrimitiveType};
 
 use crate::Vertex;
@@ -22,6 +22,7 @@ pub struct Cube {
 impl Cube {
     /**
      * 边长，0-1，标准化设备坐标系范围内
+     * 顶点顺序均为逆时针
      */
     pub fn new(id: &str, side_len: f32, display: &glium::Display, color: [f32; 3], position: Point3<f32>, model: Matrix4<f32>) -> Cube {
         let half = side_len / 2_f32;
@@ -29,40 +30,40 @@ impl Cube {
             id: id.to_string(),
             vertex_buffer: glium::VertexBuffer::new(display, &[
                 // 前
-                Vertex { position: [-half, -half, half], normal: [0_f32, 0_f32, 1_f32], texture: [0.0_f32, 0.0] },
                 Vertex { position: [-half, half, half], normal: [0_f32, 0_f32, 1_f32], texture: [0.0_f32, 1.0] },
-                Vertex { position: [half, half, half], normal: [0_f32, 0_f32, 1_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [-half, -half, half], normal: [0_f32, 0_f32, 1_f32], texture: [0.0_f32, 0.0] },
-                Vertex { position: [half, half, half], normal: [0_f32, 0_f32, 1_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [half, -half, half], normal: [0_f32, 0_f32, 1_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, half, half], normal: [0_f32, 0_f32, 1_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [half, -half, half], normal: [0_f32, 0_f32, 1_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [half, half, half], normal: [0_f32, 0_f32, 1_f32], texture: [1.0_f32, 1.0] },
                 // 后
-                Vertex { position: [-half, -half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 0.0] },
-                Vertex { position: [-half, half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 1.0] },
-                Vertex { position: [half, half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [1.0_f32, 1.0] },
-                Vertex { position: [-half, -half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 0.0] },
                 Vertex { position: [half, half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [half, -half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, -half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [half, half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [1.0_f32, 1.0] },
+                Vertex { position: [-half, -half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [-half, half, -half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 1.0] },
                 // 左
-                Vertex { position: [-half, -half, -half], normal: [-1_f32, 0_f32, 0_f32], texture: [0.0_f32, 0.0] },
                 Vertex { position: [-half, half, -half], normal: [-1_f32, 0_f32, 0_f32], texture: [0.0_f32, 1.0] },
-                Vertex { position: [-half, half, half], normal: [-1_f32, 0_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [-half, -half, -half], normal: [-1_f32, 0_f32, 0_f32], texture: [0.0_f32, 0.0] },
-                Vertex { position: [-half, half, half], normal: [-1_f32, 0_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [-half, -half, half], normal: [-1_f32, 0_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, half, -half], normal: [-1_f32, 0_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [-half, -half, half], normal: [-1_f32, 0_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, half, half], normal: [-1_f32, 0_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 // 右
-                Vertex { position: [half, -half, half], normal: [1_f32, 0_f32, 0_f32], texture: [0.0_f32, 0.0] },
                 Vertex { position: [half, half, half], normal: [1_f32, 0_f32, 0_f32], texture: [0.0_f32, 1.0] },
-                Vertex { position: [half, half, -half], normal: [1_f32, 0_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [half, -half, half], normal: [1_f32, 0_f32, 0_f32], texture: [0.0_f32, 0.0] },
-                Vertex { position: [half, half, -half], normal: [1_f32, 0_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [half, -half, -half], normal: [1_f32, 0_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [half, half, half], normal: [1_f32, 0_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [half, -half, -half], normal: [1_f32, 0_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [half, half, -half], normal: [1_f32, 0_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 // 上
-                Vertex { position: [-half, half, half], normal: [0_f32, 1_f32, 0_f32], texture: [0.0_f32, 0.0] },
                 Vertex { position: [-half, half, -half], normal: [0_f32, 1_f32, 0_f32], texture: [0.0_f32, 1.0] },
-                Vertex { position: [half, half, -half], normal: [0_f32, 1_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [-half, half, half], normal: [0_f32, 1_f32, 0_f32], texture: [0.0_f32, 0.0] },
-                Vertex { position: [half, half, -half], normal: [0_f32, 1_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 Vertex { position: [half, half, half], normal: [0_f32, 1_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, half, -half], normal: [0_f32, 1_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [half, half, half], normal: [0_f32, 1_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [half, half, -half], normal: [0_f32, 1_f32, 0_f32], texture: [1.0_f32, 1.0] },
                 // 下
                 Vertex { position: [-half, -half, half], normal: [0_f32, -1_f32, 0_f32], texture: [0.0_f32, 0.0] },
                 Vertex { position: [-half, -half, -half], normal: [0_f32, -1_f32, 0_f32], texture: [0.0_f32, 1.0] },
@@ -81,6 +82,10 @@ impl Cube {
     pub fn position_matrix(&self) -> Matrix4<f32> {
         Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z))
     }
+
+    pub fn calc_model(&self, other: Matrix4<f32>) -> Matrix4<f32> {
+        Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z)) * other * self.model
+    }
 }
 
 
@@ -90,7 +95,7 @@ pub struct Plane {
     id: String,
     pub vertex_buffer: VertexBuffer<Vertex>,
     pub index_buffer: IndexBuffer<u16>,
-    position: Point3<f32>,
+    pub position: Point3<f32>,
     model: Matrix4<f32>,
 }
 
@@ -119,7 +124,24 @@ impl Plane {
         }
     }
 
-    pub fn calc_model(&self) -> Matrix4<f32> {
-        Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z)) * self.model
+    pub fn calc_model(&self, other: Matrix4<f32>) -> Matrix4<f32> {
+        Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z)) * other * self.model
+    }
+
+    pub fn new_vertical_plane(id: &str, height: f32, width: f32, display: &glium::Display, position: Point3<f32>, model: Matrix4<f32>) -> Plane {
+        let x = width / 2.0_f32;
+        Plane {
+            id: id.to_string(),
+            vertex_buffer: glium::VertexBuffer::new(display, &[
+                // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+                Vertex { position: [-x, 0.0, 0.0], normal: [0_f32, 0.0, 1.0], texture: [0.0_f32, 0.0] },
+                Vertex { position: [x, 0.0, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-x, height, 0.0], normal: [0_f32, 0.0, 1.0], texture: [0.0_f32, 1.0] },
+                Vertex { position: [x, height, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 1.0] },
+            ]).unwrap(),
+            index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 1, 2, 3]).unwrap(),
+            position: position,
+            model: model,
+        }
     }
 }

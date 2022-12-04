@@ -2,12 +2,12 @@
 extern crate glium;
 extern crate cgmath;
 
-use std::{time::{self}};
+use std::{time::{self}, cmp::Ordering};
 
-use cgmath::{SquareMatrix, Point3, Matrix4};
+use cgmath::{SquareMatrix, Point3, Matrix4, Vector3, MetricSpace};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState}, window::CursorGrabMode}, backend::Facade};
+use glium::{glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState}, window::CursorGrabMode}};
 
 use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program};
 
@@ -22,21 +22,40 @@ fn main() {
     display.gl_window().window().set_cursor_visible(false);
 
     // 物体着色器程序
-    let obj_program = create_program("src/bin/senior_opengl_stencil_test/obj_shader_test.vert", "src/bin/senior_opengl_stencil_test/obj_shader_test.frag", &display);
+    let obj_program = create_program("src/bin/senior_opengl_blending/obj_shader_test.vert", "src/bin/senior_opengl_blending/obj_shader_test.frag", &display);
 
-    let border_program = create_program("src/bin/senior_opengl_stencil_test/obj_shader_test.vert", "src/bin/senior_opengl_stencil_test/obj_shader_color.frag", &display);
-
-    let cube1 = Cube::new("cube1", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(-1.0, 0.0, -1.0), Matrix4::identity());
-    let cube2 = Cube::new("cube2", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(2.0, 0.0, 0.0), Matrix4::identity());
+    let cube1 = Cube::new("cube1", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(-1.0, 0.5, -1.0), Matrix4::identity());
+    let cube2 = Cube::new("cube2", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(2.0, 0.5, 0.0), Matrix4::identity());
     let cubes = [cube1, cube2];
-    let plane = Plane::new("plane", 10.0, 10.0, -0.5001_f32, &display, Point3::new(0.0, 0.0, 0.0), Matrix4::identity());
+    let plane = Plane::new("plane", 10.0, 10.0, -0.001_f32, &display, Point3::new(0.0, 0.0, 0.0), Matrix4::identity());
+
+    // 草纹理
+    // let grass_texture = material::load_texture("src/grass.png".to_string(), &display).1;
+    let window_texture = material::load_texture("src/window.png".to_string(), &display).1;
+    
+    // let grass_dms = grass_texture.dimensions();
+    let mut grasses = {
+        let mut grasses = Vec::with_capacity(5);
+        let positions = [
+            [-1.0f32,  0.0, -0.48],
+            [2.0,  0.0,  0.51],
+            [0.5,  0.0,  0.7],
+            [0.2,  0.0, -2.3],
+            [1.0,  0.0, -0.6]
+        ];
+        for position in positions.iter() {
+            let grass = Plane::new_vertical_plane("grass", 1.0, 1.0, &display, Point3::new(position[0], position[1], position[2]), Matrix4::identity());
+            grasses.push(grass);
+        }
+        grasses
+    };
 
     let cube_texture = material::load_texture("src/marble.jpg".to_string(), &display).1;
     let floor_texture = material::load_texture("src/metal.png".to_string(), &display).1;
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let mut camera = Camera::new(
-        cgmath::Point3::new(0_f32, 0_f32, 7_f32), 
+        cgmath::Point3::new(0_f32, 2_f32, 7_f32), 
         cgmath::Rad::from(cgmath::Deg(-90_f32)), 
         cgmath::Rad::from(cgmath::Deg(0_f32))
     );
@@ -44,51 +63,13 @@ fn main() {
     
     let projection_matrix = Into::<[[f32; 4]; 4]>::into(cgmath::perspective(cgmath::Deg(45.0), size.width as f32 / size.height as f32, 0.1_f32, 100.0));
 
-    // 默认绘制参数
-    let draw_params = glium::DrawParameters {
+    let draw_parameters = glium::DrawParameters {
         depth: glium::Depth {
             test: glium::draw_parameters::DepthTest::IfLess,
             write: true,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    // 需要加边框的物体绘制参数
-    let bordered_obj_params = glium::DrawParameters {
-        depth: glium::Depth {
-            test: glium::draw_parameters::DepthTest::IfLess,
-            write: true,
-            ..Default::default()
-        },
-        stencil: glium::draw_parameters::Stencil {
-            test_clockwise: glium::StencilTest::AlwaysPass,
-            reference_value_clockwise: 1,
-            depth_pass_operation_clockwise: glium::StencilOperation::Replace,
-
-            test_counter_clockwise: glium::StencilTest::AlwaysPass,
-            reference_value_counter_clockwise: 1,
-            depth_pass_operation_counter_clockwise: glium::StencilOperation::Replace,
             .. Default::default()
         },
-        ..Default::default()
-    };
-    // 边框绘制参数
-    let border_params = glium::DrawParameters {
-        depth: glium::Depth {
-            test: glium::draw_parameters::DepthTest::IfLess,
-            write: true,
-            ..Default::default()
-        },
-        stencil: glium::draw_parameters::Stencil {
-            test_clockwise: glium::StencilTest::IfNotEqual { mask: 0xFFFFFF }, // 模板测试函数
-            reference_value_clockwise: 1, // 模板测试参考值
-            // write_mask_clockwise: 0x000000,
-            
-            test_counter_clockwise: glium::StencilTest::IfNotEqual { mask: 0xFFFFFF },
-            reference_value_counter_clockwise: 1,
-            // write_mask_counter_clockwise: 0x000000,
-            .. Default::default()
-        },
+        blend: glium::draw_parameters::Blend::alpha_blending(),
         .. Default::default()
     };
 
@@ -163,42 +144,40 @@ fn main() {
         // drawing a frame
         let mut target = display.draw();
         // target.clear_color(0.2, 0.3, 0.3, 1.0);
-        // 这里清除模板缓存的值代表：清除为n，而不是清除n
-        target.clear_all((0.05, 0.05, 0.05, 1.0), 1.0, 0);
+        target.clear_color_and_depth((0.05, 0.05, 0.05, 1.0), 1.0);
         
         let mut box_uniforms = DynamicUniforms::new();
         box_uniforms.add(String::from("view"), &view_matrix);
         box_uniforms.add(String::from("projection"), &projection_matrix);
         box_uniforms.add(String::from("viewPos"), &camera_position);
 
-        box_uniforms.add_str_key("texture1", &cube_texture);
-        
-        // 绘制箱子
-        for cube in cubes.iter() {
-            let mut uniforms = box_uniforms.clone();
-            let model = Into::<[[f32; 4]; 4]>::into(cube.position_matrix() * cube.model);
-            uniforms.add_str_key("model", &model);
-            // uniforms.add_str_key("texture1", &cube_texture);
-            target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &uniforms, &bordered_obj_params).unwrap();
-        }
-
-        let scale = Matrix4::from_scale(1.1_f32);
-        // 绘制边框箱子
-        // display.get_context()
-        for cube in cubes.iter() {
-            let mut uniforms = box_uniforms.clone();
-            let model = Into::<[[f32; 4]; 4]>::into(cube.position_matrix() * scale * cube.model);
-            uniforms.add_str_key("model", &model);
-            // uniforms.add_str_key("texture1", &cube_texture);
-            target.draw(&cube.vertex_buffer, &cube.index_buffer, &border_program, &uniforms, &border_params).unwrap();
-        }
-
-        // 绘制地板
         let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model(Matrix4::identity()));
         box_uniforms.add_str_key("model", &model);
         box_uniforms.add_str_key("texture1", &floor_texture);
-        target.draw(&plane.vertex_buffer, &plane.index_buffer, &obj_program, &box_uniforms, &draw_params).unwrap();
+        target.draw(&plane.vertex_buffer, &plane.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
         
+        // 箱子纹理
+        box_uniforms.add_str_key("texture1", &cube_texture);
+        for cube in cubes.iter() {
+            let mut uniforms = box_uniforms.clone();
+            let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model(Matrix4::identity()));
+            uniforms.add_str_key("model", &model);
+            target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
+        }
+
+        // 渲染草&窗户
+        box_uniforms.add_str_key("texture1", &window_texture);
+        // 到摄像机的距离降序排序
+        grasses.sort_by(|a, b| {
+            camera.position.distance2(b.position).partial_cmp(&camera.position.distance2(a.position)).unwrap()
+        });
+        // 根据窗户到摄像机的距离，由远到近渲染
+        for grass in grasses.iter() {
+            let mut uniforms = box_uniforms.clone();
+            let model = Into::<[[f32; 4]; 4]>::into(grass.calc_model(Matrix4::identity()));
+            uniforms.add_str_key("model", &model);
+            target.draw(&grass.vertex_buffer, &grass.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
+        }
 
         target.finish().unwrap();
     });

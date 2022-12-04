@@ -36,7 +36,7 @@ fn main() {
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let mut camera = Camera::new(
-        cgmath::Point3::new(0_f32, 0_f32, 7_f32), 
+        cgmath::Point3::new(0_f32, 0_f32, 9_f32), 
         cgmath::Rad::from(cgmath::Deg(-90_f32)), 
         cgmath::Rad::from(cgmath::Deg(0_f32))
     );
@@ -140,7 +140,7 @@ fn main() {
             target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
         }
 
-        let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model());
+        let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model(Matrix4::identity()));
         box_uniforms.add_str_key("model", &model);
         box_uniforms.add_str_key("texture1", &floor_texture);
         target.draw(&plane.vertex_buffer, &plane.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
