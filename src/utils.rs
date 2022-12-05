@@ -44,3 +44,22 @@ pub fn load_wavefront(display: &Display, data: &[u8]) -> VertexBufferAny {
 
     glium::vertex::VertexBuffer::new(display, &vertex_data).unwrap().into()
 }
+
+
+pub fn build_filename(name: &str, suffix: &str) -> String {
+    let mut name = name.to_string();
+    if !suffix.starts_with(".") {
+        name.push_str(".");
+    }
+    name.push_str(suffix);
+    name
+}
+
+pub fn concat_filepath(path1: &str, path2: &str) -> String {
+    let mut path = path1.to_string();
+    if !(path1.ends_with("/") || path2.starts_with("/")) {
+        path.push_str("/");
+    }
+    path.push_str(path2);
+    path
+}

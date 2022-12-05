@@ -1,10 +1,10 @@
 use std::{rc::Rc, collections::HashMap, sync::Arc, io::Cursor, fs, future, process::Output};
 
 use futures::{executor::{block_on, ThreadPool, ThreadPoolBuilder}, Future};
-use glium::{texture::CompressedSrgbTexture2d, Display};
+use glium::{texture::{CompressedSrgbTexture2d, SrgbCubemap, SrgbFormat, MipmapsOption, CubeLayer, RawImage2d, SrgbTexture2d, Cubemap}, Display, framebuffer::{SimpleFrameBuffer, ToColorAttachment}, Texture2d, Surface, BlitTarget, uniforms::MagnifySamplerFilter};
 use obj::Mtl;
 
-use crate::uniforms::{DynamicUniforms, add_to_uniforms};
+use crate::{uniforms::{DynamicUniforms, add_to_uniforms}, utils};
 
 /**
  * 材质
@@ -193,6 +193,12 @@ pub async fn load_texture_async(path: String, display: &Display) -> (String, Com
 }
 
 pub fn load_texture(path: String, display: &Display) -> (String, CompressedSrgbTexture2d) {
+    let temp = path.clone();
+    let image = load_image(&temp);
+    (path, glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap())
+}
+
+pub fn load_image(path: &str) -> RawImage2d<u8> {
     println!("加载材质图片: {}", path);
     let format = {
         if path.ends_with(".png") {
@@ -203,8 +209,42 @@ pub fn load_texture(path: String, display: &Display) -> (String, CompressedSrgbT
             panic!("不支持的图片格式");
         }
     };
-    let image = image::load(Cursor::new(fs::read(path.as_str()).unwrap()), format).unwrap().to_rgba8();
+    let image = image::load(Cursor::new(fs::read(path).unwrap()), format).unwrap().to_rgba8();
     let image_dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
-    (path, glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap())
+    RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions)
+}
+
+static CUBEMAP_FILES: [(&str, CubeLayer); 6] = [
+    ("right", CubeLayer::PositiveX), 
+    ("left", CubeLayer::NegativeX), 
+    ("top", CubeLayer::PositiveY), 
+    ("bottom", CubeLayer::NegativeY), 
+    ("front", CubeLayer::PositiveZ), 
+    ("back", CubeLayer::NegativeZ)
+];
+
+// 加载立方体贴图
+pub fn load_cubemap(dir: &str, suffix: &str, display: &Display) -> Cubemap {
+    let cube_texture = Cubemap::empty(display, 512).unwrap();
+
+    for item in CUBEMAP_FILES.iter() {
+        let file_name = utils::build_filename(item.0, suffix);
+        let path = utils::concat_filepath(dir, &file_name);
+        let image = load_image(&path);
+        let image_width = image.width.clone() as i32;
+        let image_height = image.height.clone() as i32;
+
+        let texture = Texture2d::new(display, image).unwrap();
+        let rect = BlitTarget {
+            left: 0,
+            bottom: 0,
+            width: image_width,
+            height: image_height,
+        };
+
+        let framebuffer = SimpleFrameBuffer::new(display, cube_texture.main_level().image(item.1)).unwrap();
+        texture.as_surface().blit_whole_color_to(&framebuffer, &rect, MagnifySamplerFilter::Linear);
+    }
+
+    cube_texture
 }

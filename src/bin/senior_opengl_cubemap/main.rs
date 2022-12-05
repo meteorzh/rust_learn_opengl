@@ -7,7 +7,7 @@ use std::{time::{self}};
 use cgmath::{SquareMatrix, Point3, Matrix4};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState}, window::CursorGrabMode}, texture};
+use glium::{glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState}, window::CursorGrabMode}, texture::CubeLayer, uniforms::{UniformValue, self}, framebuffer::{ToColorAttachment, ColorAttachment}};
 
 use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program};
 
@@ -15,27 +15,25 @@ fn main() {
     let event_loop = event_loop::EventLoop::new();
     let size: glutin::dpi::LogicalSize<u32> = (800, 600).into();
     let wb = window::WindowBuilder::new().with_inner_size(size);
-    let cb = glutin::ContextBuilder::new().with_depth_buffer(24);
+    let cb = glutin::ContextBuilder::new().with_depth_buffer(24).with_stencil_buffer(8);
     let display = glium::Display::new(wb, cb, &event_loop).unwrap();
     
     display.gl_window().window().set_cursor_grab(CursorGrabMode::Confined).unwrap();
     display.gl_window().window().set_cursor_visible(false);
 
     // 物体着色器程序
-    let obj_program = create_program("src/bin/senior_opengl_depth_test/obj_shader_test.vert", "src/bin/senior_opengl_depth_test/obj_shader_test.frag", &display);
-    // 线性深度测试
-    // let obj_program = create_program("src/bin/senior_opengl_depth_test/obj_shader_test.vert", "src/bin/senior_opengl_depth_test/obj_shader_test_linear.frag", &display);
+    let obj_program = create_program("src/bin/senior_opengl_cubemap/obj_shader_test.vert", "src/bin/senior_opengl_cubemap/obj_shader_test.frag", &display);
+    // skybox着色器程序
+    let skybox_program = create_program("src/bin/senior_opengl_cubemap/skybox.vert", "src/bin/senior_opengl_cubemap/skybox.frag", &display);
+    let screen_program = create_program("src/bin/senior_opengl_framebuffer_1/obj_shader_1.vert", "src/bin/senior_opengl_framebuffer_1/obj_shader_1.frag", &display);
 
-    let cube1 = Cube::new("cube1", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(-1.0, 0.0, -1.0), Matrix4::identity());
-    let cube2 = Cube::new("cube2", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(2.0, 0.0, 0.0), Matrix4::identity());
-    let cubes = [cube1, cube2];
-    let plane = Plane::new("plane", 10.0, 10.0, -0.5001_f32, &display, Point3::new(0.0, 0.0, 0.0), Matrix4::identity());
+    let cube = Cube::new("cube1", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(-1.0, 0.0, -1.0), Matrix4::identity());
+    let skybox = Cube::new("skybox", 2.0, &display, [1.0, 1.0, 1.0], Point3 { x: 0.0, y: 0.0, z: 0.0 }, Matrix4::identity());
 
-    let cube_texture = material::load_texture("src/marble.jpg".to_string(), &display).1;
-    let floor_texture = material::load_texture("src/metal.png".to_string(), &display).1;
-    let cube_texture = texture::SrgbCubemap::empty_with_format(&display, texture::SrgbFormat::U8U8U8U8, 
-        texture::MipmapsOption::NoMipmap, 128).unwrap();
-    // cube_texture.main_level().ima
+    let screen = Plane::new_2d_plane("screen", 2.0, 2.0, &display);
+
+    let cube_texture = material::load_texture("src/container.jpg".to_string(), &display).1;
+    let skybox_texture = material::load_cubemap("src/skybox/", "jpg", &display);
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let mut camera = Camera::new(
@@ -51,6 +49,14 @@ fn main() {
         depth: glium::Depth {
             test: glium::draw_parameters::DepthTest::IfLess,
             write: true,
+            .. Default::default()
+        },
+        .. Default::default()
+    };
+
+    let skybox_parameters = glium::DrawParameters {
+        depth: glium::Depth {
+            test: glium::draw_parameters::DepthTest::Ignore,
             .. Default::default()
         },
         .. Default::default()
@@ -133,20 +139,26 @@ fn main() {
         box_uniforms.add(String::from("view"), &view_matrix);
         box_uniforms.add(String::from("projection"), &projection_matrix);
         box_uniforms.add(String::from("viewPos"), &camera_position);
-        
-        // 循环渲染模型
-        for cube in cubes.iter() {
-            let mut uniforms = box_uniforms.clone();
-            let model = Into::<[[f32; 4]; 4]>::into(cube.position_matrix() * cube.model);
-            uniforms.add_str_key("model", &model);
-            uniforms.add_str_key("texture1", &cube_texture);
-            target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
-        }
 
-        let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model(Matrix4::identity()));
+        // 绘制skybox
+        box_uniforms.add_str_key("skybox", &skybox_texture);
+        // target.draw(&skybox.vertex_buffer, &skybox.index_buffer, &skybox_program, &box_uniforms, &skybox_parameters).unwrap();
+        box_uniforms.remove("skybox");
+        
+        // 绘制立方体
+        let model = Into::<[[f32; 4]; 4]>::into(cube.position_matrix() * cube.model);
         box_uniforms.add_str_key("model", &model);
-        box_uniforms.add_str_key("texture1", &floor_texture);
-        target.draw(&plane.vertex_buffer, &plane.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
+        box_uniforms.add_str_key("texture1", &cube_texture);
+        // target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
+
+        // 直接渲染帧缓冲中的纹理
+        // let mut screen_uniforms = DynamicUniforms::new();
+        // let image = skybox_texture.main_level().image(CubeLayer::NegativeZ);
+        // let color: ColorAttachment = image.to_color_attachment();
+        // if let ColorAttachment::Texture(t) = color {
+        //     screen_uniforms.add_str_key("texture1", t.get_texture());
+        //     target.draw(&screen.vertex_buffer, &screen.index_buffer, &screen_program, &screen_uniforms, &Default::default()).unwrap();
+        // }
 
         target.finish().unwrap();
     });
