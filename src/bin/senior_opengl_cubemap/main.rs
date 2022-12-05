@@ -28,7 +28,7 @@ fn main() {
     let screen_program = create_program("src/bin/senior_opengl_framebuffer_1/obj_shader_1.vert", "src/bin/senior_opengl_framebuffer_1/obj_shader_1.frag", &display);
 
     let cube = Cube::new("cube1", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(-1.0, 0.0, -1.0), Matrix4::identity());
-    let skybox = Cube::new("skybox", 2.0, &display, [1.0, 1.0, 1.0], Point3 { x: 0.0, y: 0.0, z: 0.0 }, Matrix4::identity());
+    let skybox = Cube::new_skybox("skybox", 50.0, &display);
 
     let screen = Plane::new_2d_plane("screen", 2.0, 2.0, &display);
 
@@ -142,14 +142,14 @@ fn main() {
 
         // 绘制skybox
         box_uniforms.add_str_key("skybox", &skybox_texture);
-        // target.draw(&skybox.vertex_buffer, &skybox.index_buffer, &skybox_program, &box_uniforms, &skybox_parameters).unwrap();
+        target.draw(&skybox.vertex_buffer, &skybox.index_buffer, &skybox_program, &box_uniforms, &skybox_parameters).unwrap();
         box_uniforms.remove("skybox");
         
         // 绘制立方体
         let model = Into::<[[f32; 4]; 4]>::into(cube.position_matrix() * cube.model);
         box_uniforms.add_str_key("model", &model);
         box_uniforms.add_str_key("texture1", &cube_texture);
-        // target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
+        target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
 
         // 直接渲染帧缓冲中的纹理
         // let mut screen_uniforms = DynamicUniforms::new();

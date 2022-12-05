@@ -79,6 +79,62 @@ impl Cube {
         }
     }
 
+    // 创建天空盒box
+    pub fn new_skybox(id: &str, side_len: f32, display: &glium::Display) -> Cube {
+        let half = side_len / 2_f32;
+        Cube {
+            id: id.to_string(),
+            vertex_buffer: glium::VertexBuffer::new(display, &[
+                // 前
+                Vertex { position: [-half, half, -half], normal: [0_f32, 0_f32, 1_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [-half, -half, -half], normal: [0_f32, 0_f32, 1_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [half, -half, -half], normal: [0_f32, 0_f32, 1_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, half, -half], normal: [0_f32, 0_f32, 1_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [half, -half, -half], normal: [0_f32, 0_f32, 1_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [half, half, -half], normal: [0_f32, 0_f32, 1_f32], texture: [1.0_f32, 1.0] },
+                // 后
+                Vertex { position: [half, half, half], normal: [0_f32, 0_f32, -1_f32], texture: [1.0_f32, 1.0] },
+                Vertex { position: [half, -half, half], normal: [0_f32, 0_f32, -1_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, -half, half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [half, half, half], normal: [0_f32, 0_f32, -1_f32], texture: [1.0_f32, 1.0] },
+                Vertex { position: [-half, -half, half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [-half, half, half], normal: [0_f32, 0_f32, -1_f32], texture: [0.0_f32, 1.0] },
+                // 左
+                Vertex { position: [-half, half, half], normal: [1_f32, 0_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [-half, -half, half], normal: [1_f32, 0_f32, 0_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [-half, -half, -half], normal: [1_f32, 0_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, half, half], normal: [1_f32, 0_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [-half, -half, -half], normal: [1_f32, 0_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, half, -half], normal: [1_f32, 0_f32, 0_f32], texture: [1.0_f32, 1.0] },
+                // 右
+                Vertex { position: [half, half, -half], normal: [-1_f32, 0_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [half, -half, -half], normal: [-1_f32, 0_f32, 0_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [half, -half, half], normal: [-1_f32, 0_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [half, half, -half], normal: [-1_f32, 0_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [half, -half, half], normal: [-1_f32, 0_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [half, half, half], normal: [-1_f32, 0_f32, 0_f32], texture: [1.0_f32, 1.0] },
+                // 上
+                Vertex { position: [-half, half, half], normal: [0_f32, -1_f32, 0_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [-half, half, -half], normal: [0_f32, -1_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [half, half, -half], normal: [0_f32, -1_f32, 0_f32], texture: [1.0_f32, 1.0] },
+                Vertex { position: [-half, half, half], normal: [0_f32, -1_f32, 0_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [half, half, -half], normal: [0_f32, -1_f32, 0_f32], texture: [1.0_f32, 1.0] },
+                Vertex { position: [half, half, half], normal: [0_f32, -1_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                // 下
+                Vertex { position: [-half, -half, -half], normal: [0_f32, 1_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [-half, -half, half], normal: [0_f32, 1_f32, 0_f32], texture: [0.0_f32, 0.0] },
+                Vertex { position: [half, -half, half], normal: [0_f32, 1_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [-half, -half, -half], normal: [0_f32, 1_f32, 0_f32], texture: [0.0_f32, 1.0] },
+                Vertex { position: [half, -half, half], normal: [0_f32, 1_f32, 0_f32], texture: [1.0_f32, 0.0] },
+                Vertex { position: [half, -half, -half], normal: [0_f32, 1_f32, 0_f32], texture: [1.0_f32, 1.0] },
+            ]).unwrap(),
+            index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &CUBE_INDEX_ARRAY).unwrap(),
+            color: [0.0, 0.0, 0.0],
+            position: Point3::new(0.0, 0.0, 0.0),
+            model: Matrix4::identity(),
+        }
+    }
+
     pub fn position_matrix(&self) -> Matrix4<f32> {
         Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z))
     }

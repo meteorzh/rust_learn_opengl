@@ -225,7 +225,7 @@ static CUBEMAP_FILES: [(&str, CubeLayer); 6] = [
 
 // 加载立方体贴图
 pub fn load_cubemap(dir: &str, suffix: &str, display: &Display) -> Cubemap {
-    let cube_texture = Cubemap::empty(display, 512).unwrap();
+    let cube_texture = Cubemap::empty(display, 2048).unwrap();
 
     for item in CUBEMAP_FILES.iter() {
         let file_name = utils::build_filename(item.0, suffix);
@@ -234,6 +234,7 @@ pub fn load_cubemap(dir: &str, suffix: &str, display: &Display) -> Cubemap {
         let image_width = image.width.clone() as i32;
         let image_height = image.height.clone() as i32;
 
+        println!("{}, {}", image_width, image_height);
         let texture = Texture2d::new(display, image).unwrap();
         let rect = BlitTarget {
             left: 0,
@@ -243,7 +244,8 @@ pub fn load_cubemap(dir: &str, suffix: &str, display: &Display) -> Cubemap {
         };
 
         let framebuffer = SimpleFrameBuffer::new(display, cube_texture.main_level().image(item.1)).unwrap();
-        texture.as_surface().blit_whole_color_to(&framebuffer, &rect, MagnifySamplerFilter::Linear);
+        println!("{:#?}", framebuffer.get_dimensions());
+        texture.as_surface().blit_whole_color_to(&framebuffer, &rect, MagnifySamplerFilter::Nearest);
     }
 
     cube_texture
