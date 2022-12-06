@@ -1,7 +1,7 @@
-use std::{rc::Rc, collections::HashMap, sync::Arc, io::Cursor, fs, future, process::Output};
+use std::{rc::Rc, collections::HashMap, sync::Arc, io::Cursor, fs};
 
-use futures::{executor::{block_on, ThreadPool, ThreadPoolBuilder}, Future};
-use glium::{texture::{CompressedSrgbTexture2d, SrgbCubemap, SrgbFormat, MipmapsOption, CubeLayer, RawImage2d, SrgbTexture2d, Cubemap}, Display, framebuffer::{SimpleFrameBuffer, ToColorAttachment}, Texture2d, Surface, BlitTarget, uniforms::MagnifySamplerFilter};
+use futures::{executor::{block_on, ThreadPool, ThreadPoolBuilder}};
+use glium::{texture::{CompressedSrgbTexture2d, SrgbCubemap, CubeLayer, RawImage2d}, Display, framebuffer::{SimpleFrameBuffer}, Texture2d, Surface, BlitTarget, uniforms::MagnifySamplerFilter};
 use obj::Mtl;
 
 use crate::{uniforms::{DynamicUniforms, add_to_uniforms}, utils};
@@ -39,10 +39,14 @@ pub struct Material {
     pub specular_map: Option<Rc<CompressedSrgbTexture2d>>,
     /// The emissive color map, specified by `map_Ke`
     pub emissive_map: Option<Rc<CompressedSrgbTexture2d>>,
+    /// The specular highlight component
+    pub specular_hightlight_map: Option<Rc<CompressedSrgbTexture2d>>,
     /// The dissolve map, specified by `map_d`
     pub dissolve_map: Option<Rc<CompressedSrgbTexture2d>>,
     /// The bump map (normal map), specified by `bump`
     pub bump_map: Option<Rc<CompressedSrgbTexture2d>>,
+    /// spherical reflection map
+    pub reflect_map: Option<Rc<CompressedSrgbTexture2d>>,
 }
 
 impl Material {
@@ -65,6 +69,11 @@ impl Material {
 
         if let Some(shininess) = &self.shininess {
             add_to_uniforms(key, ".shininess", shininess, uniforms);
+        }
+
+        if let Some(reflection) = &self.reflect_map {
+            // reflection.sampled()
+            add_to_uniforms(key, ".reflection", reflection.as_ref(), uniforms);
         }
     }
 }
@@ -139,8 +148,10 @@ impl MaterialLoader {
             diffuse_map: self.find_2d_texture(&obj_material.map_kd, basepath),
             specular_map: self.find_2d_texture(&obj_material.map_ks, basepath),
             emissive_map: self.find_2d_texture(&obj_material.map_ke, basepath),
+            specular_hightlight_map: self.find_2d_texture(&obj_material.map_ns, basepath),
             dissolve_map: self.find_2d_texture(&obj_material.map_d, basepath),
             bump_map: self.find_2d_texture(&obj_material.map_bump, basepath),
+            reflect_map: self.find_2d_texture(&obj_material.map_refl, basepath),
         };
         self.cache.insert(name, Rc::new(material));
     }
