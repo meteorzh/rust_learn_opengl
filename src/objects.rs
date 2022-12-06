@@ -201,6 +201,24 @@ impl Plane {
         }
     }
 
+    pub fn new_vertical_center_plane(id: &str, height: f32, width: f32, display: &glium::Display) -> Plane {
+        let x = width / 2.0_f32;
+        let y = height / 2.0_f32;
+        Plane {
+            id: id.to_string(),
+            vertex_buffer: glium::VertexBuffer::new(display, &[
+                // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+                Vertex { position: [-x, y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [0.0_f32, 1.0] },
+                Vertex { position: [-x, -y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [0.0_f32, 0.0] },
+                Vertex { position: [x, -y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 0.0] },
+                Vertex { position: [x, y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 1.0] },
+            ]).unwrap(),
+            index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 0, 2, 3]).unwrap(),
+            position: Point3::new(0.0, 0.0, 0.0),
+            model: Matrix4::identity(),
+        }
+    }
+
     // 以原点为中心创建2d平面
     pub fn new_2d_plane(id: &str, height: f32, width: f32, display: &glium::Display) -> Plane {
         let x = width / 2.0_f32;

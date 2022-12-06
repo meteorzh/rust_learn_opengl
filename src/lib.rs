@@ -196,3 +196,21 @@ pub fn create_program(vert_source_path: &str, frag_source_path: &str, display: &
         ProgramCreationInput::from(obj_shader_source)
     ).unwrap()
 }
+
+pub fn create_program_vgf(vert_source_path: &str, geometry_source_path: &str, frag_source_path: &str, display: &Display) -> Program {
+    let obj_vert_source = fs::read_to_string(vert_source_path).unwrap();
+    let obj_frag_source = fs::read_to_string(frag_source_path).unwrap();
+    let geometry_source = fs::read_to_string(geometry_source_path).unwrap();
+    let obj_shader_source = SourceCode {
+        vertex_shader: obj_vert_source.as_str(),
+        tessellation_control_shader: None,
+        tessellation_evaluation_shader: None,
+        geometry_shader: Some(geometry_source.as_str()),
+        fragment_shader: obj_frag_source.as_str(),
+    };
+
+    glium::Program::new(
+        display,
+        ProgramCreationInput::from(obj_shader_source)
+    ).unwrap()
+}
