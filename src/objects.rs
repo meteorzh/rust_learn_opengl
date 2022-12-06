@@ -201,7 +201,7 @@ impl Plane {
         }
     }
 
-    pub fn new_vertical_center_plane(id: &str, height: f32, width: f32, display: &glium::Display) -> Plane {
+    pub fn new_vertical_center_plane(id: &str, height: f32, width: f32, display: &glium::Display, primitive_type: PrimitiveType) -> Plane {
         let x = width / 2.0_f32;
         let y = height / 2.0_f32;
         Plane {
@@ -213,7 +213,7 @@ impl Plane {
                 Vertex { position: [x, -y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 0.0] },
                 Vertex { position: [x, y, 0.0], normal: [0_f32, 0.0, 1.0], texture: [1.0_f32, 1.0] },
             ]).unwrap(),
-            index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 0, 2, 3]).unwrap(),
+            index_buffer: glium::IndexBuffer::new(display, primitive_type, &[0u16, 1, 2, 0, 2, 3]).unwrap(),
             position: Point3::new(0.0, 0.0, 0.0),
             model: Matrix4::identity(),
         }

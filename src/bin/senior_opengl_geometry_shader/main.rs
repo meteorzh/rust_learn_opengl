@@ -7,7 +7,7 @@ use std::{time::{self}};
 use cgmath::{SquareMatrix, Point3, Matrix4, Matrix3};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{glutin::{window::CursorGrabMode}, PolygonMode};
+use glium::{glutin::{window::CursorGrabMode}, PolygonMode, index::PrimitiveType};
 
 use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard, create_program_vgf};
 
@@ -24,7 +24,7 @@ fn main() {
     // 物体着色器程序
     let program = create_program_vgf(
         "src/bin/senior_opengl_geometry_shader/geometry.vert", 
-        "src/bin/senior_opengl_geometry_shader/geometry.geom", 
+        "src/bin/senior_opengl_geometry_shader/geometry_house.geom", 
         "src/bin/senior_opengl_geometry_shader/geometry.frag", 
         &display);
     // let program = create_program(
@@ -32,7 +32,7 @@ fn main() {
     //     "src/bin/senior_opengl_geometry_shader/geometry.frag", 
     //     &display);
 
-    let plane = Plane::new_vertical_center_plane("plane", 1.0, 1.0, &display);
+    let plane = Plane::new_vertical_center_plane("plane", 1.0, 1.0, &display, PrimitiveType::Points);
 
     let mut controller = CameraController::new(5_f32, 0.8_f32);
 
