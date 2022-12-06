@@ -4,7 +4,7 @@ extern crate cgmath;
 
 use std::io::Cursor;
 use std::time;
-use cgmath::{Matrix4, SquareMatrix};
+use cgmath::{Matrix4, SquareMatrix, Point3};
 use glium::glutin::window::CursorGrabMode;
 use glium::uniforms::{MagnifySamplerFilter, MinifySamplerFilter, SamplerWrapFunction};
 use rust_opengl_learn::camera::{Camera, CameraController};
@@ -13,8 +13,10 @@ use glium::glutin::event::{KeyboardInput, VirtualKeyCode, ElementState};
 use glium::{Surface};
 use glium::glutin::{self, event_loop, window, event};
 use image::ImageFormat;
+use rust_opengl_learn::material;
 use rust_opengl_learn::objects::Cube;
 
+// 使用自定义的cube绘制天空盒, 使用自定义加载方式加载cubemap
 fn main() {
     let event_loop = event_loop::EventLoop::new();
     let size = LogicalSize::new(800_u32, 600_u32);
@@ -26,51 +28,54 @@ fn main() {
     display.gl_window().window().set_cursor_visible(false);
 
     // 右
-    let image = image::load(Cursor::new(&include_bytes!("../../skybox/right.jpg")[..]),
-                        ImageFormat::Jpeg).unwrap().to_rgba8();
-    let image_dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
-    let tex_posx = glium::Texture2d::new(&display, image).unwrap();
+    // let image = image::load(Cursor::new(&include_bytes!("../../skybox/right.jpg")[..]),
+    //                     ImageFormat::Jpeg).unwrap().to_rgba8();
+    // let image_dimensions = image.dimensions();
+    // let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
+    // let tex_posx = glium::Texture2d::new(&display, image).unwrap();
 
-    // 左
-    let image = image::load(Cursor::new(&include_bytes!("../../skybox/left.jpg")[..]),
-                        ImageFormat::Jpeg).unwrap().to_rgba8();
-    let image_dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
-    let tex_negx = glium::Texture2d::new(&display, image).unwrap();
+    // // 左
+    // let image = image::load(Cursor::new(&include_bytes!("../../skybox/left.jpg")[..]),
+    //                     ImageFormat::Jpeg).unwrap().to_rgba8();
+    // let image_dimensions = image.dimensions();
+    // let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
+    // let tex_negx = glium::Texture2d::new(&display, image).unwrap();
 
-    // 上
-    let image = image::load(Cursor::new(&include_bytes!("../../skybox/top.jpg")[..]),
-                        ImageFormat::Jpeg).unwrap().to_rgba8();
-    let image_dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
-    let tex_posy = glium::Texture2d::new(&display, image).unwrap();
+    // // 上
+    // let image = image::load(Cursor::new(&include_bytes!("../../skybox/top.jpg")[..]),
+    //                     ImageFormat::Jpeg).unwrap().to_rgba8();
+    // let image_dimensions = image.dimensions();
+    // let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
+    // let tex_posy = glium::Texture2d::new(&display, image).unwrap();
 
-    // 下
-    let image = image::load(Cursor::new(&include_bytes!("../../skybox/bottom.jpg")[..]),
-                        ImageFormat::Jpeg).unwrap().to_rgba8();
-    let image_dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
-    let tex_negy = glium::Texture2d::new(&display, image).unwrap();
+    // // 下
+    // let image = image::load(Cursor::new(&include_bytes!("../../skybox/bottom.jpg")[..]),
+    //                     ImageFormat::Jpeg).unwrap().to_rgba8();
+    // let image_dimensions = image.dimensions();
+    // let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
+    // let tex_negy = glium::Texture2d::new(&display, image).unwrap();
 
-    // 后
-    let image = image::load(Cursor::new(&include_bytes!("../../skybox/back.jpg")[..]),
-                        ImageFormat::Jpeg).unwrap().to_rgba8();
-    let image_dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
-    let tex_posz = glium::Texture2d::new(&display, image).unwrap();
+    // // 后
+    // let image = image::load(Cursor::new(&include_bytes!("../../skybox/front.jpg")[..]),
+    //                     ImageFormat::Jpeg).unwrap().to_rgba8();
+    // let image_dimensions = image.dimensions();
+    // let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
+    // let tex_posz = glium::Texture2d::new(&display, image).unwrap();
 
-    // 前
-    let image = image::load(Cursor::new(&include_bytes!("../../skybox/front.jpg")[..]),
-                        ImageFormat::Jpeg).unwrap().to_rgba8();
-    let image_dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
-    let tex_negz = glium::Texture2d::new(&display, image).unwrap();
+    // // 前
+    // let image = image::load(Cursor::new(&include_bytes!("../../skybox/back.jpg")[..]),
+    //                     ImageFormat::Jpeg).unwrap().to_rgba8();
+    // let image_dimensions = image.dimensions();
+    // let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
+    // let tex_negz = glium::Texture2d::new(&display, image).unwrap();
 
-    let cubemap = glium::texture::Cubemap::empty(&display, 512).unwrap();
+    // let cubemap = glium::texture::Cubemap::empty(&display, 512).unwrap();
+    let cubemap = material::load_cubemap("src/skybox/", ".jpg", &display, 512);
 
-    // skybox
-    let skybox = Cube::new_skybox("skybox", 200.0, &display);
+    // 使用skybox
+    // let skybox = Cube::new_skybox("skybox", 200.0, &display);
+    // 使用cube
+    let skybox = Cube::new("skybox", 200.0, &display, [0.0, 0.0, 0.0], Point3::new(0.0, 0.0, 0.0), Matrix4::identity());
 
     let skybox_program = glium::Program::from_source(&display,
         " #version 140
@@ -280,31 +285,31 @@ fn main() {
 
         controller.update_camera(&mut camera, delta_frame);
 
-        let  framebuffer1 = glium::framebuffer::SimpleFrameBuffer::new(&display,
-                        cubemap.main_level().image(glium::texture::CubeLayer::PositiveX)).unwrap();
-        let  framebuffer2 = glium::framebuffer::SimpleFrameBuffer::new(&display,
-                        cubemap.main_level().image(glium::texture::CubeLayer::NegativeX)).unwrap();
-        let  framebuffer3 = glium::framebuffer::SimpleFrameBuffer::new(&display,
-                        cubemap.main_level().image(glium::texture::CubeLayer::PositiveY)).unwrap();
-        let  framebuffer4 = glium::framebuffer::SimpleFrameBuffer::new(&display,
-                        cubemap.main_level().image(glium::texture::CubeLayer::NegativeY)).unwrap();
-        let  framebuffer5 = glium::framebuffer::SimpleFrameBuffer::new(&display,
-                        cubemap.main_level().image(glium::texture::CubeLayer::PositiveZ)).unwrap();
-        let  framebuffer6 = glium::framebuffer::SimpleFrameBuffer::new(&display,
-                        cubemap.main_level().image(glium::texture::CubeLayer::NegativeZ)).unwrap();
+        // let  framebuffer1 = glium::framebuffer::SimpleFrameBuffer::new(&display,
+        //                 cubemap.main_level().image(glium::texture::CubeLayer::PositiveX)).unwrap();
+        // let  framebuffer2 = glium::framebuffer::SimpleFrameBuffer::new(&display,
+        //                 cubemap.main_level().image(glium::texture::CubeLayer::NegativeX)).unwrap();
+        // let  framebuffer3 = glium::framebuffer::SimpleFrameBuffer::new(&display,
+        //                 cubemap.main_level().image(glium::texture::CubeLayer::PositiveY)).unwrap();
+        // let  framebuffer4 = glium::framebuffer::SimpleFrameBuffer::new(&display,
+        //                 cubemap.main_level().image(glium::texture::CubeLayer::NegativeY)).unwrap();
+        // let  framebuffer5 = glium::framebuffer::SimpleFrameBuffer::new(&display,
+        //                 cubemap.main_level().image(glium::texture::CubeLayer::PositiveZ)).unwrap();
+        // let  framebuffer6 = glium::framebuffer::SimpleFrameBuffer::new(&display,
+        //                 cubemap.main_level().image(glium::texture::CubeLayer::NegativeZ)).unwrap();
 
-        tex_posx.as_surface().blit_whole_color_to(&framebuffer1, &dest_rect1,
-                        glium::uniforms::MagnifySamplerFilter::Linear);
-        tex_negx.as_surface().blit_whole_color_to(&framebuffer2, &dest_rect1,
-                        glium::uniforms::MagnifySamplerFilter::Linear);
-        tex_posy.as_surface().blit_whole_color_to(&framebuffer3, &dest_rect1,
-                        glium::uniforms::MagnifySamplerFilter::Linear);
-        tex_negy.as_surface().blit_whole_color_to(&framebuffer4, &dest_rect1,
-                        glium::uniforms::MagnifySamplerFilter::Linear);
-        tex_posz.as_surface().blit_whole_color_to(&framebuffer5, &dest_rect1,
-                        glium::uniforms::MagnifySamplerFilter::Linear);
-        tex_negz.as_surface().blit_whole_color_to(&framebuffer6, &dest_rect1,
-                        glium::uniforms::MagnifySamplerFilter::Linear);
+        // tex_posx.as_surface().blit_whole_color_to(&framebuffer1, &dest_rect1,
+        //                 glium::uniforms::MagnifySamplerFilter::Linear);
+        // tex_negx.as_surface().blit_whole_color_to(&framebuffer2, &dest_rect1,
+        //                 glium::uniforms::MagnifySamplerFilter::Linear);
+        // tex_posy.as_surface().blit_whole_color_to(&framebuffer3, &dest_rect1,
+        //                 glium::uniforms::MagnifySamplerFilter::Linear);
+        // tex_negy.as_surface().blit_whole_color_to(&framebuffer4, &dest_rect1,
+        //                 glium::uniforms::MagnifySamplerFilter::Linear);
+        // tex_posz.as_surface().blit_whole_color_to(&framebuffer5, &dest_rect1,
+        //                 glium::uniforms::MagnifySamplerFilter::Linear);
+        // tex_negz.as_surface().blit_whole_color_to(&framebuffer6, &dest_rect1,
+        //                 glium::uniforms::MagnifySamplerFilter::Linear);
 
         let mut target = display.draw();
         target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
@@ -318,13 +323,13 @@ fn main() {
         let material_color: [f32; 4] = [0.9, 0.9, 0.9, 1.0];
         let reflect_factor: f32 = 0.9;
 
-        let skybox_texture = cubemap.sampled().magnify_filter(MagnifySamplerFilter::Linear)
-            .minify_filter(MinifySamplerFilter::Linear).wrap_function(SamplerWrapFunction::Clamp);
+        // let skybox_texture = cubemap.sampled().magnify_filter(MagnifySamplerFilter::Linear)
+        //     .minify_filter(MinifySamplerFilter::Linear).wrap_function(SamplerWrapFunction::Clamp);
 
         let skybox_uniforms = uniform! {
             view: view,
             perspective: perspective,
-	        cubetex: skybox_texture,
+	        cubetex: &cubemap,
         };
 
         let model_uniforms = uniform! {

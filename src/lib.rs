@@ -11,6 +11,7 @@ pub mod lights;
 pub mod uniforms;
 pub mod material;
 pub mod objects;
+pub mod keyboard;
 
 
 #[derive(Copy, Clone)]

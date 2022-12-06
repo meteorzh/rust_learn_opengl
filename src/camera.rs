@@ -33,9 +33,23 @@ impl Camera {
         }
     }
 
+    // 观察矩阵
     pub fn calc_matrix(&self) -> Matrix4<f32> {
         Matrix4::look_to_rh(
             self.position,
+            Vector3::new(
+                self.yaw.0.cos(),
+                self.pitch.0.sin(),
+                self.yaw.0.sin(),
+            ).normalize(),
+            Vector3::unit_y(),
+        )
+    }
+
+    // 观察矩阵-移除位移
+    pub fn calc_matrix_no_move(&self) -> Matrix4<f32> {
+        Matrix4::look_to_rh(
+            Point3::new(0.0, 0.0, 0.0),
             Vector3::new(
                 self.yaw.0.cos(),
                 self.pitch.0.sin(),

@@ -54,14 +54,14 @@ fn main() {
     let tex_negy = glium::Texture2d::new(&display, image).unwrap();
 
     // 后
-    let image = image::load(Cursor::new(&include_bytes!("../../skybox/back.jpg")[..]),
+    let image = image::load(Cursor::new(&include_bytes!("../../skybox/front.jpg")[..]),
                         ImageFormat::Jpeg).unwrap().to_rgba8();
     let image_dimensions = image.dimensions();
     let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
     let tex_posz = glium::Texture2d::new(&display, image).unwrap();
 
     // 前
-    let image = image::load(Cursor::new(&include_bytes!("../../skybox/front.jpg")[..]),
+    let image = image::load(Cursor::new(&include_bytes!("../../skybox/back.jpg")[..]),
                         ImageFormat::Jpeg).unwrap().to_rgba8();
     let image_dimensions = image.dimensions();
     let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);

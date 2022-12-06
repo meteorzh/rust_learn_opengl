@@ -4,12 +4,12 @@ extern crate cgmath;
 
 use std::{time::{self}};
 
-use cgmath::{SquareMatrix, Point3, Matrix4, Matrix3};
+use cgmath::{SquareMatrix, Point3, Matrix4};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::glutin::{window::CursorGrabMode};
 
-use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube}, material, create_program, keyboard};
+use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube}, material, create_program, keyboard, load_wavefront_obj_as_models};
 
 fn main() {
     let event_loop = event_loop::EventLoop::new();
@@ -22,14 +22,14 @@ fn main() {
     display.gl_window().window().set_cursor_visible(false);
 
     // 物体着色器程序
-    let obj_program = create_program("src/bin/senior_opengl_cubemap/obj_shader_test.vert", "src/bin/senior_opengl_cubemap/obj_shader_test.frag", &display);
+    let obj_program = create_program("src/bin/senior_opengl_cubemap_reflect/box_reflect.vert", "src/bin/senior_opengl_cubemap_reflect/box_reflect.frag", &display);
     // skybox着色器程序
-    let skybox_program = create_program("src/bin/senior_opengl_cubemap/skybox.vert", "src/bin/senior_opengl_cubemap/skybox.frag", &display);
+    let skybox_program = create_program("src/bin/senior_opengl_cubemap_reflect/skybox.vert", "src/bin/senior_opengl_cubemap_reflect/skybox.frag", &display);
 
     let cube = Cube::new("cube1", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(-1.0, 0.0, -1.0), Matrix4::identity());
     let skybox = Cube::new_skybox("skybox", 2.0, &display);
+    let models = load_wavefront_obj_as_models(&display, "src/nanosuit/", "nanosuit.obj");
 
-    let cube_texture = material::load_texture("src/container.jpg".to_string(), &display).1;
     let skybox_texture = material::load_cubemap("src/skybox/", "jpg", &display, 2048);
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
@@ -133,24 +133,29 @@ fn main() {
         let mut box_uniforms = DynamicUniforms::new();
         box_uniforms.add(String::from("projection"), &projection_matrix);
         box_uniforms.add(String::from("viewPos"), &camera_position);
+        box_uniforms.add_str_key("skybox", &skybox_texture);
         
         // 绘制立方体
         let view_matrix = Into::<[[f32; 4]; 4]>::into(camera.calc_matrix());
         box_uniforms.add_str_key("view", &view_matrix);
         let model = Into::<[[f32; 4]; 4]>::into(cube.position_matrix() * cube.model);
         box_uniforms.add_str_key("model", &model);
-        box_uniforms.add_str_key("texture1", &cube_texture);
         target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
+        
+        let model_matrix = Into::<[[f32; 4]; 4]>::into(Matrix4::identity());
+        // 循环渲染模型
+        for model in models.iter() {
+            box_uniforms.add_str_key("model", &model_matrix);
+            target.draw(&model.vertex_buffer, &model.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
+        }
+
         box_uniforms.remove("model");
-        box_uniforms.remove("texture1");
 
         // 绘制skybox
         // 绘制skybox时需要移除观察矩阵的位移性质，使摄像机无论如何移动，始终在天空盒内
         let view_matrix = Into::<[[f32; 4]; 4]>::into(camera.calc_matrix_no_move());
         box_uniforms.add_str_key("view", &view_matrix);
-        box_uniforms.add_str_key("skybox", &skybox_texture);
         target.draw(&skybox.vertex_buffer, &skybox.index_buffer, &skybox_program, &box_uniforms, &draw_parameters).unwrap();
-        
 
         target.finish().unwrap();
     });

@@ -211,7 +211,7 @@ pub fn load_image(path: &str) -> RawImage2d<u8> {
     };
     let image = image::load(Cursor::new(fs::read(path).unwrap()), format).unwrap().to_rgba8();
     let image_dimensions = image.dimensions();
-    RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions)
+    RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions)
 }
 
 static CUBEMAP_FILES: [(&str, CubeLayer); 6] = [
@@ -224,28 +224,24 @@ static CUBEMAP_FILES: [(&str, CubeLayer); 6] = [
 ];
 
 // 加载立方体贴图
-pub fn load_cubemap(dir: &str, suffix: &str, display: &Display) -> Cubemap {
-    let cube_texture = Cubemap::empty(display, 2048).unwrap();
+pub fn load_cubemap(dir: &str, suffix: &str, display: &Display, dimensions: i32) -> SrgbCubemap {
+    let cube_texture = SrgbCubemap::empty(display, dimensions as u32).unwrap();
 
     for item in CUBEMAP_FILES.iter() {
         let file_name = utils::build_filename(item.0, suffix);
         let path = utils::concat_filepath(dir, &file_name);
         let image = load_image(&path);
-        let image_width = image.width.clone() as i32;
-        let image_height = image.height.clone() as i32;
 
-        println!("{}, {}", image_width, image_height);
         let texture = Texture2d::new(display, image).unwrap();
         let rect = BlitTarget {
             left: 0,
             bottom: 0,
-            width: image_width,
-            height: image_height,
+            width: dimensions,
+            height: dimensions,
         };
 
         let framebuffer = SimpleFrameBuffer::new(display, cube_texture.main_level().image(item.1)).unwrap();
-        println!("{:#?}", framebuffer.get_dimensions());
-        texture.as_surface().blit_whole_color_to(&framebuffer, &rect, MagnifySamplerFilter::Nearest);
+        texture.as_surface().blit_whole_color_to(&framebuffer, &rect, MagnifySamplerFilter::Linear);
     }
 
     cube_texture
