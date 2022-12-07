@@ -12,6 +12,7 @@ pub mod uniforms;
 pub mod material;
 pub mod objects;
 pub mod keyboard;
+pub mod objectsv2;
 
 
 #[derive(Copy, Clone)]
@@ -22,6 +23,14 @@ pub struct Vertex {
 }
 
 implement_vertex!(Vertex, position, normal, texture);
+
+#[derive(Copy, Clone)]
+pub struct ColorVertex {
+    pub position: [f32; 3],
+    pub color: [f32; 3],
+}
+
+implement_vertex!(ColorVertex, position, color);
 
 
 pub struct Model {

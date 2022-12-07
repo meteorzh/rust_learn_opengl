@@ -7,9 +7,9 @@ use std::{time::{self}};
 use cgmath::{SquareMatrix, Point3, Matrix4, Matrix3};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{glutin::{window::CursorGrabMode}, PolygonMode, index::PrimitiveType};
+use glium::{glutin::{window::CursorGrabMode}, PolygonMode, index::PrimitiveType, VertexBuffer, IndexBuffer};
 
-use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard, create_program_vgf};
+use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard, create_program_vgf, objectsv2::RawVertexPC};
 
 fn main() {
     let event_loop = event_loop::EventLoop::new();
@@ -24,7 +24,7 @@ fn main() {
     // 物体着色器程序
     let program = create_program_vgf(
         "src/bin/senior_opengl_geometry_shader/geometry.vert", 
-        "src/bin/senior_opengl_geometry_shader/geometry_house.geom", 
+        "src/bin/senior_opengl_geometry_shader/geometry_house_color.geom", 
         "src/bin/senior_opengl_geometry_shader/geometry.frag", 
         &display);
     // let program = create_program(
@@ -32,12 +32,19 @@ fn main() {
     //     "src/bin/senior_opengl_geometry_shader/geometry.frag", 
     //     &display);
 
-    let plane = Plane::new_vertical_center_plane("plane", 1.0, 1.0, &display, PrimitiveType::Points);
+    let vertexs = [
+        RawVertexPC { position: [-0.5, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
+        RawVertexPC { position: [0.5, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
+        RawVertexPC { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
+        RawVertexPC { position: [-0.5, -0.5, 0.0], color: [1.0, 1.0, 0.0] },
+    ];
+    let vertex_buffer = VertexBuffer::new(&display, &vertexs).unwrap();
+    let index_buffer = IndexBuffer::new(&display, PrimitiveType::Points, &[0u16, 1, 2, 3]).unwrap();
 
     let mut controller = CameraController::new(5_f32, 0.8_f32);
 
     let draw_parameters = glium::DrawParameters {
-        polygon_mode: PolygonMode::Line,
+        polygon_mode: PolygonMode::Fill,
         .. Default::default()
     };
 
@@ -92,7 +99,7 @@ fn main() {
 
         let uniforms = DynamicUniforms::new();
         
-        target.draw(&plane.vertex_buffer, &plane.index_buffer, &program, &uniforms, &draw_parameters).unwrap();
+        target.draw(&vertex_buffer, &index_buffer, &program, &uniforms, &draw_parameters).unwrap();
         
 
         target.finish().unwrap();
