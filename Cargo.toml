@@ -11,3 +11,5 @@ image = "0.24.3"
 cgmath = { version = "0.18.0", features = ["swizzle"]}
 obj = { version = "0.10.2", features = ["genmesh"] }
 futures = { version = "0.3.25", features = ["thread-pool"]}
+chrono = "0.4.23"
+num-traits = "0.2.15"
