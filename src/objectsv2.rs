@@ -3,6 +3,13 @@ use glium::implement_vertex;
 
 
 #[derive(Copy, Clone)]
+pub struct RawVertexP2 {
+    pub position: [f32; 2],
+}
+
+implement_vertex!(RawVertexP2, position);
+
+#[derive(Copy, Clone)]
 pub struct RawVertexP {
     pub position: [f32; 3],
 }
@@ -24,6 +31,22 @@ pub struct RawVertexPC {
 }
 
 implement_vertex!(RawVertexPC, position, color);
+
+#[derive(Copy, Clone)]
+pub struct RawVertexP2C {
+    pub position: [f32; 2],
+    pub color: [f32; 3],
+}
+
+implement_vertex!(RawVertexP2C, position, color);
+
+
+#[derive(Copy, Clone)]
+pub struct RawInstanceOffsetO2 {
+    pub offset: [f32; 2],
+}
+
+implement_vertex!(RawInstanceOffsetO2, offset);
 
 // 可绘制特征，需要实现获取vertexBuffer, indexBuffer等
 pub trait Drawable {
