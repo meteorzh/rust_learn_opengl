@@ -48,6 +48,13 @@ pub struct RawInstanceOffsetO2 {
 
 implement_vertex!(RawInstanceOffsetO2, offset);
 
+#[derive(Copy, Clone)]
+pub struct RawInstanceDataM4 {
+    pub model: [[f32; 4]; 4],
+}
+
+implement_vertex!(RawInstanceDataM4, model);
+
 // 可绘制特征，需要实现获取vertexBuffer, indexBuffer等
 pub trait Drawable {
     
