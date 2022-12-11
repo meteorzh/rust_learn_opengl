@@ -5,7 +5,7 @@ use cgmath::{Point3, Rad, Matrix4, Vector3};
 
 use cgmath::{prelude::*};
 use glium::glutin::dpi::PhysicalPosition;
-use glium::glutin::event::{VirtualKeyCode, ElementState, MouseScrollDelta};
+use glium::glutin::event::{VirtualKeyCode, ElementState, MouseScrollDelta, Event, WindowEvent, DeviceEvent};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
@@ -103,7 +103,31 @@ impl CameraController {
         }
     }
 
-    pub fn process_keyboard(&mut self, key: VirtualKeyCode, state: ElementState) -> bool{
+    pub fn proccess(&mut self, event: &Event<()>) {
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                // key input
+                WindowEvent::KeyboardInput { input, .. } => {
+                    if let Some(key) = input.virtual_keycode {
+                        self.process_keyboard(key, input.state);
+                    }
+                },
+                _ => {},
+            },
+            Event::DeviceEvent { event, .. } => match event {
+                DeviceEvent::MouseMotion { delta } => {
+                    self.process_mouse(delta.0, delta.1)
+                },
+                DeviceEvent::MouseWheel { delta } => {
+                    self.process_scroll(&delta);
+                },
+                _ => {},
+            },
+            _ => {},
+        }
+    }
+
+    pub fn process_keyboard(&mut self, key: VirtualKeyCode, state: ElementState) -> bool {
         let amount = if state == ElementState::Pressed { 2.0 } else { 0.0 };
         match key {
             VirtualKeyCode::W | VirtualKeyCode::Up => {

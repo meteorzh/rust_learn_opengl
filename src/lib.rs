@@ -1,7 +1,9 @@
-use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}, future};
+use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}, future, time::{Instant, Duration}};
 
+use camera::CameraController;
 use cgmath::{Vector3, Zero, Vector2};
-use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, texture::CompressedSrgbTexture2d, program::{SourceCode, ProgramCreationInput}, Program};
+use event::EventHandler;
+use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, texture::CompressedSrgbTexture2d, program::{SourceCode, ProgramCreationInput}, Program, glutin::{event_loop::{EventLoop, ControlFlow}, event::{Event, WindowEvent, DeviceEvent, StartCause, KeyboardInput, VirtualKeyCode, ElementState}}};
 use material::{Material, MaterialLoader};
 use obj::{ObjData, ObjMaterial};
 
@@ -13,7 +15,9 @@ pub mod material;
 pub mod objects;
 pub mod keyboard;
 pub mod objectsv2;
-
+pub mod event;
+pub mod mouse;
+pub mod context;
 
 #[derive(Copy, Clone)]
 pub struct Vertex {
@@ -113,81 +117,81 @@ pub fn load_wavefront_obj_as_models(display: &Display, basepath: &str, obj_file:
 }
 
 
+pub enum Action {
+    Stop,
+    Continue,
+}
 
+pub fn start_loop<F>(event_loop: EventLoop<()>, mut event_handler: EventHandler, mut render_func: F) 
+    where F: 'static + FnMut(Option<Event<'_, ()>>, Duration, &mut EventHandler) -> Action {
 
-// struct MaterialLoader {
-//     cache: HashMap<String, Rc<Material>>,
-//     map_cache: HashMap<String, Rc<CompressedSrgbTexture2d>>,
-// }
+    let mut last_frame = Instant::now();
 
-// impl MaterialLoader {
-    
-//     fn new() -> MaterialLoader {
-//         MaterialLoader { cache: HashMap::new(), map_cache: HashMap::new() }
-//     }
+    event_loop.run(move |event, _, control_flow| {
+        let mut render = false;
+        let mut raw_event: Option<Event<()>> = None;
 
-//     fn load(&mut self, obj_material: &Arc<obj::Material>, basepath: &str, display: &Display) {
-//         let name = obj_material.name.clone();
-//         if self.cache.contains_key(&name) {
-//             return;
-//         }
+        if let Some(event) = event.to_static() {
+            match &event {
+                Event::WindowEvent { event, .. } => match event {
+                    // Break from the main loop when the window is closed.
+                    WindowEvent::CloseRequested => {
+                        *control_flow = ControlFlow::Exit;
+                    },
+                    // key input
+                    WindowEvent::KeyboardInput { input, .. } => {
+                        if let Some(cf) = handle_keyboard_input(*input) {
+                            *control_flow = cf;
+                        }
+                    },
+                    _ => {},
+                },
+                Event::NewEvents(cause) => match cause {
+                    StartCause::ResumeTimeReached { .. } | StartCause::Init => {
+                        // 帧时间限制达到后可以渲染
+                        // 初始化时可以渲染
+                        render = true;
+                    },
+                    _ => {},
+                },
+                _ => {},
+            }
+            event_handler.handle(&event);
 
-//         let material = Material {
-//             ambient: obj_material.ka,
-//             diffuse: obj_material.kd,
-//             specular: obj_material.ks,
-//             emissive: obj_material.ke,
-//             transmission_filter: obj_material.tf,
-//             shininess: obj_material.ns,
-//             illumination_model: obj_material.illum,
-//             dissolve: obj_material.d,
-//             specular_exponent: None,
-//             optical_density: obj_material.ni,
-//             ambient_map: self.parse_2d_texture(&obj_material.map_ka, basepath, display),
-//             diffuse_map: self.parse_2d_texture(&obj_material.map_kd, basepath, display),
-//             specular_map: self.parse_2d_texture(&obj_material.map_ks, basepath, display),
-//             emissive_map: self.parse_2d_texture(&obj_material.map_ke, basepath, display),
-//             dissolve_map: self.parse_2d_texture(&obj_material.map_d, basepath, display),
-//             bump_map: self.parse_2d_texture(&obj_material.map_bump, basepath, display),
-//         };
-//         self.cache.insert(name, Rc::new(material));
-//     }
+            if !render {
+                return;
+            }
 
-//     fn parse_2d_texture(&mut self, file: &Option<String>, basepath: &str, display: &Display) -> Option<Rc<CompressedSrgbTexture2d>> {
-//         match file {
-//             Some(file) => {
-//                 let mut path = String::from(basepath);
-//                 path.push_str(file.as_str());
-//                 // 现在缓存中找
-//                 match self.map_cache.get(&path) {
-//                     Some(texture_2d) => return Some(Rc::clone(texture_2d)),
-//                     None => (),
-//                 };
+            raw_event = Some(event);
+        }
+        let current = Instant::now();
+        let next_frame_time = current + Duration::from_nanos(16_666_667);
 
-//                 let image = image::load(Cursor::new(fs::read(path.as_str()).unwrap()), image::ImageFormat::Png).unwrap().to_rgba8();
-//                 let image_dimensions = image.dimensions();
-//                 let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
-//                 let opengl_texture = glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap();
+        match render_func(raw_event, current.duration_since(last_frame), &mut event_handler) {
+            Action::Continue => {
+                last_frame = current;
+                *control_flow = ControlFlow::WaitUntil(next_frame_time);
+            },
+            Action::Stop => *control_flow = ControlFlow::Exit
+        }
+    });
+}
 
-//                 let texture_map = Rc::new(opengl_texture);
-//                 let result = Rc::clone(&texture_map);
-//                 self.map_cache.insert(path, texture_map);
-                
-//                 Some(result)
-//             },
-//             None => None,
-//         }
-//     }
+fn handle_keyboard_input(input: KeyboardInput) -> Option<ControlFlow> {
+    if let Some(keycode) = input.virtual_keycode {
+        match keycode {
+            VirtualKeyCode::Escape => {
+                if input.state == ElementState::Released {
+                    return Some(ControlFlow::Exit);
+                }
+            },
+            _ => {}
+        }
+    }
 
-//     fn find_in_cache(&self, name: String) -> Option<Rc<Material>> {
-//         match self.cache.get(&name) {
-//             Some(material) => {
-//                 Some(Rc::clone(material))
-//             },
-//             None => None,
-//         }
-//     }
-// }
+    None
+}
+
 
 pub fn create_program(vert_source_path: &str, frag_source_path: &str, display: &Display) -> Program {
     let obj_vert_source = fs::read_to_string(vert_source_path).unwrap();
