@@ -2,6 +2,7 @@ use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self,
 
 use camera::CameraController;
 use cgmath::{Vector3, Zero, Vector2};
+use context::LoopContext;
 use event::EventHandler;
 use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, texture::CompressedSrgbTexture2d, program::{SourceCode, ProgramCreationInput}, Program, glutin::{event_loop::{EventLoop, ControlFlow}, event::{Event, WindowEvent, DeviceEvent, StartCause, KeyboardInput, VirtualKeyCode, ElementState}}};
 use material::{Material, MaterialLoader};
@@ -122,8 +123,8 @@ pub enum Action {
     Continue,
 }
 
-pub fn start_loop<F>(event_loop: EventLoop<()>, mut event_handler: EventHandler, mut render_func: F) 
-    where F: 'static + FnMut(Option<Event<'_, ()>>, Duration, &mut EventHandler) -> Action {
+pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext<'static>, mut render_func: F) 
+    where F: 'static + FnMut(Option<Event<'_, ()>>, Duration, &mut LoopContext) -> Action {
 
     let mut last_frame = Instant::now();
 
@@ -156,7 +157,7 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut event_handler: EventHandler,
                 },
                 _ => {},
             }
-            event_handler.handle(&event);
+            ctx.handle_event(&event);
 
             if !render {
                 return;
@@ -165,12 +166,17 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut event_handler: EventHandler,
             raw_event = Some(event);
         }
         let current = Instant::now();
-        let next_frame_time = current + Duration::from_nanos(16_666_667);
+        let frame_duration = current.duration_since(last_frame);
 
-        match render_func(raw_event, current.duration_since(last_frame), &mut event_handler) {
+        ctx.prepare_render(frame_duration);
+
+        match render_func(raw_event, frame_duration, &mut ctx) {
             Action::Continue => {
-                last_frame = current;
+                // 下一帧时间
+                let next_frame_time = current + Duration::from_nanos(16_666_667);
                 *control_flow = ControlFlow::WaitUntil(next_frame_time);
+                // 更新上一帧时间变量
+                last_frame = current;
             },
             Action::Stop => *control_flow = ControlFlow::Exit
         }
@@ -191,6 +197,8 @@ fn handle_keyboard_input(input: KeyboardInput) -> Option<ControlFlow> {
 
     None
 }
+
+
 
 
 pub fn create_program(vert_source_path: &str, frag_source_path: &str, display: &Display) -> Program {

@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
 
@@ -5,7 +7,11 @@ use cgmath::{Point3, Rad, Matrix4, Vector3};
 
 use cgmath::{prelude::*};
 use glium::glutin::dpi::PhysicalPosition;
-use glium::glutin::event::{VirtualKeyCode, ElementState, MouseScrollDelta, Event, WindowEvent, DeviceEvent};
+use glium::glutin::event::{VirtualKeyCode, ElementState, MouseScrollDelta, Event, WindowEvent, DeviceEvent, KeyboardInput};
+
+use crate::context::PrepareRender;
+use crate::event::keyboard::KeyboardInteract;
+use crate::event::mouse::MouseInteract;
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
@@ -213,5 +219,51 @@ impl CameraController {
         } else if camera.pitch > Rad(SAFE_FRAC_PI_2) {
             camera.pitch = Rad(SAFE_FRAC_PI_2);
         }
+    }
+}
+
+
+/// 摄像机控制类代理
+/// 保持摄像机控制类的内部可变性
+pub struct CameraControllerProxy {
+
+    controller: RefCell<CameraController>,
+}
+
+impl CameraControllerProxy {
+
+    pub fn new(controller: CameraController) -> CameraControllerProxy {
+        CameraControllerProxy { controller: RefCell::new(controller) }
+    }
+}
+
+impl KeyboardInteract for CameraControllerProxy {
+
+    fn interact_keycodes() -> Vec<VirtualKeyCode> {
+        vec![VirtualKeyCode::Up, VirtualKeyCode::Down, VirtualKeyCode::Left, VirtualKeyCode::Right, VirtualKeyCode::Space, VirtualKeyCode::LShift]
+    }
+
+    fn interact(&self, input: KeyboardInput) {
+        if let Some(keycode) = input.virtual_keycode {
+            self.controller.borrow_mut().process_keyboard(keycode, input.state);
+        }
+    }
+}
+
+impl MouseInteract for CameraControllerProxy {
+
+    fn motion_interact(&mut self, delta: (f64, f64)) {
+        self.controller.borrow_mut().process_mouse(delta.0, delta.1);
+    }
+
+    fn wheel_interact(&mut self, delta: MouseScrollDelta) {
+        self.controller.borrow_mut().process_scroll(&delta);
+    }
+}
+
+impl PrepareRender for CameraControllerProxy {
+
+    fn prepare(&self, camera: &mut Camera, frame_duration: Duration) {
+        self.controller.borrow_mut().update_camera(camera, frame_duration);
     }
 }

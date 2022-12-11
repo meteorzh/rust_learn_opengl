@@ -7,6 +7,7 @@ use crate::{keyboard::KeyboardController, mouse::MouseController, camera::Camera
 use self::mouse::MouseEventHandler;
 
 pub mod mouse;
+pub mod keyboard;
 
 pub struct EventHandler {
 

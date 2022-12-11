@@ -9,7 +9,7 @@ use cgmath::{SquareMatrix, Point3, Matrix4};
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState, Event}, window::CursorGrabMode}};
 
-use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard::{handle_keyboard_input, KeyboardController}, start_loop, Action, mouse::MouseController, event::EventHandler};
+use rust_opengl_learn::{camera::{Camera, CameraController, CameraControllerProxy}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard::{handle_keyboard_input, KeyboardController}, start_loop, Action, mouse::MouseController, event::EventHandler};
 
 fn main() {
     let event_loop = event_loop::EventLoop::new();
@@ -41,6 +41,7 @@ fn main() {
         cgmath::Rad::from(cgmath::Deg(0_f32))
     );
     let controller = CameraController::new(1_f32, 0.5_f32);
+    let controller = CameraControllerProxy::new(controller);
     
     let projection_matrix = Into::<[[f32; 4]; 4]>::into(cgmath::perspective(cgmath::Deg(45.0), size.width as f32 / size.height as f32, 0.1_f32, 100.0));
 
