@@ -2,25 +2,42 @@ use std::time::Duration;
 
 use glium::glutin::event::Event;
 
-use crate::{event::EventHandler, camera::Camera};
+use crate::{event::{EventHandler}, camera::{Camera, CameraControllerProxy}};
 
 
 pub struct LoopContext<'a> {
 
-    event_handler: EventHandler,
+    event_handler: EventHandler<'a>,
 
     camera: Camera,
 
     prepares: Vec<&'a dyn PrepareRender>,
+
+    camera_controller: CameraControllerProxy,
 }
 
 impl <'a> LoopContext<'a> {
+
+    pub fn new(event_handler: EventHandler<'a>, camera: Camera, camera_controller: CameraControllerProxy) -> LoopContext<'a> {
+        LoopContext {
+            event_handler,
+            camera: camera,
+            prepares: Vec::new(),
+            camera_controller,
+        }
+    }
+
+    pub fn register_prepare(&mut self, prepare: &'a impl PrepareRender) {
+        self.prepares.push(prepare);
+    }
 
     pub fn handle_event(&mut self, event: &Event<()>) {
         self.event_handler.handle(event);
     }
 
     pub fn prepare_render(&mut self, frame_duration: Duration) {
+        self.camera_controller.prepare(&mut self.camera, frame_duration);
+        
         for prepare in self.prepares.iter() {
             prepare.prepare(&mut self.camera, frame_duration);
         }

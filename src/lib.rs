@@ -3,7 +3,7 @@ use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self,
 use camera::CameraController;
 use cgmath::{Vector3, Zero, Vector2};
 use context::LoopContext;
-use event::EventHandler;
+use event::{EventHandler, keyboard::KeyboardInteract, mouse::MouseInteract};
 use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, texture::CompressedSrgbTexture2d, program::{SourceCode, ProgramCreationInput}, Program, glutin::{event_loop::{EventLoop, ControlFlow}, event::{Event, WindowEvent, DeviceEvent, StartCause, KeyboardInput, VirtualKeyCode, ElementState}}};
 use material::{Material, MaterialLoader};
 use obj::{ObjData, ObjMaterial};
@@ -124,7 +124,7 @@ pub enum Action {
 }
 
 pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext<'static>, mut render_func: F) 
-    where F: 'static + FnMut(Option<Event<'_, ()>>, Duration, &mut LoopContext) -> Action {
+    where F: 'static + FnMut(Option<Event<'_, ()>>, Duration, &mut LoopContext<'static>) -> Action {
 
     let mut last_frame = Instant::now();
 

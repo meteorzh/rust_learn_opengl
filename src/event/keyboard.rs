@@ -7,21 +7,27 @@ use glium::glutin::event::{VirtualKeyCode, KeyboardInput};
 /// 键盘交互特征
 pub trait KeyboardInteract {
 
-    fn interact_keycodes() -> Vec<VirtualKeyCode>;
+    fn interact_keycodes(&self) -> Vec<VirtualKeyCode>;
 
     fn interact(&self, input: KeyboardInput);
 }
 
-pub struct KeyboardHandler {
+pub struct KeyboardHandler<'a> {
     
     pub funcs: HashMap<VirtualKeyCode, Box<dyn Fn()>>,
+
+    interacts: Vec<&'a dyn KeyboardInteract>,
+
+    interact_map: HashMap<VirtualKeyCode, usize>,
 }
 
-impl KeyboardHandler {
+impl <'a> KeyboardHandler<'a> {
 
-    pub fn new() -> KeyboardHandler {
+    pub fn new() -> KeyboardHandler<'a> {
         KeyboardHandler {
-            funcs: HashMap::new()
+            funcs: HashMap::new(),
+            interacts: Vec::new(),
+            interact_map: HashMap::new(),
         }
     }
 
@@ -29,10 +35,22 @@ impl KeyboardHandler {
         self.funcs.insert(keycode, handler);
     }
 
+    pub fn register2(&mut self, interact: &'a impl KeyboardInteract) {
+        let index = self.interacts.len();
+        self.interacts.push(interact);
+        for keycode in interact.interact_keycodes().iter() {
+            self.interact_map.insert(*keycode, index);
+        }
+    }
+
     pub fn process_keyboard(&self, input: KeyboardInput) {
         if let Some(code) = input.virtual_keycode {
-            if let Some(func) = self.funcs.get(&code) {
-                func();
+            if let Some(index) = self.interact_map.get(&code) {
+                if let Some(interact) = self.interacts.get(*index) {
+                    (*interact).interact(input);
+                } else {
+                    println!("error: no interact found for keycode {:#?}", code);
+                }
             } else {
                 println!("unsupported keyboard input: {:#?}", code);
             }

@@ -239,7 +239,7 @@ impl CameraControllerProxy {
 
 impl KeyboardInteract for CameraControllerProxy {
 
-    fn interact_keycodes() -> Vec<VirtualKeyCode> {
+    fn interact_keycodes(&self) -> Vec<VirtualKeyCode> {
         vec![VirtualKeyCode::Up, VirtualKeyCode::Down, VirtualKeyCode::Left, VirtualKeyCode::Right, VirtualKeyCode::Space, VirtualKeyCode::LShift]
     }
 
@@ -252,11 +252,11 @@ impl KeyboardInteract for CameraControllerProxy {
 
 impl MouseInteract for CameraControllerProxy {
 
-    fn motion_interact(&mut self, delta: (f64, f64)) {
+    fn motion_interact(&self, delta: (f64, f64)) {
         self.controller.borrow_mut().process_mouse(delta.0, delta.1);
     }
 
-    fn wheel_interact(&mut self, delta: MouseScrollDelta) {
+    fn wheel_interact(&self, delta: MouseScrollDelta) {
         self.controller.borrow_mut().process_scroll(&delta);
     }
 }

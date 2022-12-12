@@ -1,25 +1,22 @@
-use std::time::Duration;
 
-use glium::glutin::{event_loop::ControlFlow, event::{KeyboardInput, Event, WindowEvent, DeviceEvent}};
+use glium::glutin::{event::{Event, WindowEvent, DeviceEvent}};
 
-use crate::{keyboard::KeyboardController, mouse::MouseController, camera::Camera};
-
-use self::mouse::MouseEventHandler;
+use self::{mouse::{MouseHandler}, keyboard::{KeyboardHandler}};
 
 pub mod mouse;
 pub mod keyboard;
 
-pub struct EventHandler {
+pub struct EventHandler<'a> {
 
-    keyboard_controller: KeyboardController,
+    keyboard_handler: KeyboardHandler<'a>,
 
-    mouse_handler: Box<dyn MouseEventHandler>,
+    mouse_handler: MouseHandler<'a>,
 }
 
-impl EventHandler {
+impl <'a> EventHandler<'a> {
 
-    pub fn new(keyboard_controller: KeyboardController, mouse_handler: Box<dyn MouseEventHandler>) -> EventHandler {
-        EventHandler { keyboard_controller: keyboard_controller, mouse_handler: mouse_handler }
+    pub fn new(keyboard_handler: KeyboardHandler<'a>, mouse_handler: MouseHandler<'a>) -> EventHandler<'a> {
+        EventHandler { keyboard_handler, mouse_handler }
     }
 
     pub fn handle(&mut self, event: &Event<()>) {
@@ -27,24 +24,17 @@ impl EventHandler {
             Event::WindowEvent { event, .. } => match event {
                 // key input
                 WindowEvent::KeyboardInput { input, .. } => {
-                    self.keyboard_controller.process_keyboard(*input);
+                    self.keyboard_handler.process_keyboard(*input);
                 },
                 _ => {},
             },
             Event::DeviceEvent { event, .. } => match event {
-                DeviceEvent::MouseMotion { delta } => {
-                    self.mouse_handler.handle_motion((delta.0, delta.1));
-                },
-                DeviceEvent::MouseWheel { delta } => {
-                    self.mouse_handler.handle_wheel(*delta);
+                DeviceEvent::MouseMotion { .. } | DeviceEvent::MouseWheel { .. } => {
+                    self.mouse_handler.process_mouse(event);
                 },
                 _ => {},
             },
             _ => {},
         }
-    }
-
-    pub fn update_camera(&mut self, camera: &mut Camera, frame_delta: Duration) {
-        self.mouse_handler.update_camera(camera, frame_delta);
     }
 }

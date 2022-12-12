@@ -9,7 +9,7 @@ use cgmath::{SquareMatrix, Point3, Matrix4};
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState, Event}, window::CursorGrabMode}};
 
-use rust_opengl_learn::{camera::{Camera, CameraController, CameraControllerProxy}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard::{handle_keyboard_input, KeyboardController}, start_loop, Action, mouse::MouseController, event::EventHandler};
+use rust_opengl_learn::{camera::{Camera, CameraController, CameraControllerProxy}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard::{handle_keyboard_input, KeyboardController}, start_loop, Action, mouse::MouseController, event::{EventHandler, keyboard::{KeyboardHandler, KeyboardInteract}, mouse::{MouseHandler, MouseInteract}}, context::LoopContext};
 
 fn main() {
     let event_loop = event_loop::EventLoop::new();
@@ -55,17 +55,15 @@ fn main() {
     };
 
     // 事件处理逻辑
-    let mut keyboard_controller = KeyboardController::new();
-    keyboard_controller.register(VirtualKeyCode::B, Box::new(|| {
+    let mut keyboard_handler = KeyboardHandler::new();
 
-    }));
+    let mut mouse_handler = MouseHandler::new();
 
-    let mouse_controller = MouseController::new(controller);
+    let event_handler = EventHandler::new(keyboard_handler, mouse_handler);
 
-    let event_handler = EventHandler::new(keyboard_controller, Box::new(mouse_controller));
+    let loop_context = LoopContext::new(event_handler, camera, controller);
 
-    start_loop(event_loop, event_handler, move |_: Option<Event<()>>, frame_delta, event_handler| {
-        event_handler.update_camera(&mut camera, frame_delta);
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, frame_delta, ctx| {
         // 摄像机观察矩阵
         let view_matrix = Into::<[[f32; 4]; 4]>::into(camera.calc_matrix());
 
