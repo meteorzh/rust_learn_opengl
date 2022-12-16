@@ -124,7 +124,7 @@ pub enum Action {
 }
 
 pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext<'static>, mut render_func: F) 
-    where F: 'static + FnMut(Option<Event<'_, ()>>, Duration, &mut LoopContext<'static>) -> Action {
+    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext<'static>) -> Action {
 
     let mut last_frame = Instant::now();
 
@@ -170,7 +170,7 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext<'static>, m
 
         ctx.prepare_render(frame_duration);
 
-        match render_func(raw_event, frame_duration, &mut ctx) {
+        match render_func(raw_event, &mut ctx) {
             Action::Continue => {
                 // 下一帧时间
                 let next_frame_time = current + Duration::from_nanos(16_666_667);

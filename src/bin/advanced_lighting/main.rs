@@ -63,11 +63,11 @@ fn main() {
 
     let loop_context = LoopContext::new(event_handler, camera, controller);
 
-    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, frame_delta, ctx| {
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
         // 摄像机观察矩阵
-        let view_matrix = Into::<[[f32; 4]; 4]>::into(camera.calc_matrix());
+        let view_matrix = Into::<[[f32; 4]; 4]>::into(ctx.camera.calc_matrix());
 
-        let camera_position = Into::<[f32; 3]>::into(camera.position);
+        let camera_position = Into::<[f32; 3]>::into(ctx.camera.position);
 
         // drawing a frame
         let mut target = display.draw();

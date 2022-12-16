@@ -2,14 +2,18 @@ use std::time::Duration;
 
 use glium::glutin::event::Event;
 
-use crate::{event::{EventHandler}, camera::{Camera, CameraControllerProxy}};
+use crate::{event::{EventHandler, keyboard::KeyboardHandler, mouse::MouseHandler}, camera::{Camera, CameraControllerProxy}};
 
 
 pub struct LoopContext<'a> {
 
     event_handler: EventHandler<'a>,
 
-    camera: Camera,
+    keyboard_handler: KeyboardHandler,
+
+    mouse_handler: MouseHandler,
+
+    pub camera: Camera,
 
     prepares: Vec<&'a dyn PrepareRender>,
 
@@ -19,12 +23,18 @@ pub struct LoopContext<'a> {
 impl <'a> LoopContext<'a> {
 
     pub fn new(event_handler: EventHandler<'a>, camera: Camera, camera_controller: CameraControllerProxy) -> LoopContext<'a> {
-        LoopContext {
+        let mut ctx = LoopContext {
             event_handler,
             camera: camera,
             prepares: Vec::new(),
             camera_controller,
-        }
+        };
+        ctx.setup();
+        ctx
+    }
+
+    fn setup(&mut self) {
+
     }
 
     pub fn register_prepare(&mut self, prepare: &'a impl PrepareRender) {
