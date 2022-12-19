@@ -19,7 +19,7 @@ impl <'a> EventHandler<'a> {
         EventHandler { keyboard_handler, mouse_handler }
     }
 
-    pub fn handle(&mut self, event: &Event<()>) {
+    pub fn handle(&self, event: &Event<()>) {
         match event {
             Event::WindowEvent { event, .. } => match event {
                 // key input

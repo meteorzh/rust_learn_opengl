@@ -13,8 +13,6 @@ pub trait KeyboardInteract {
 }
 
 pub struct KeyboardHandler<'a> {
-    
-    pub funcs: HashMap<VirtualKeyCode, Box<dyn Fn()>>,
 
     interacts: Vec<&'a dyn KeyboardInteract>,
 
@@ -25,14 +23,9 @@ impl <'a> KeyboardHandler<'a> {
 
     pub fn new() -> KeyboardHandler<'a> {
         KeyboardHandler {
-            funcs: HashMap::new(),
             interacts: Vec::new(),
             interact_map: HashMap::new(),
         }
-    }
-
-    pub fn register(&mut self, keycode: VirtualKeyCode, handler: Box<dyn Fn()>) {
-        self.funcs.insert(keycode, handler);
     }
 
     pub fn register2(&mut self, interact: &'a impl KeyboardInteract) {

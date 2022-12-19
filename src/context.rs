@@ -5,36 +5,32 @@ use glium::glutin::event::Event;
 use crate::{event::{EventHandler, keyboard::KeyboardHandler, mouse::MouseHandler}, camera::{Camera, CameraControllerProxy}};
 
 
+#[derive(Debug)]
+pub struct LoopStore {
+    pub camera_controller: CameraControllerProxy,
+}
+
 pub struct LoopContext<'a> {
 
     event_handler: EventHandler<'a>,
 
-    keyboard_handler: KeyboardHandler,
-
-    mouse_handler: MouseHandler,
-
     pub camera: Camera,
 
     prepares: Vec<&'a dyn PrepareRender>,
-
-    camera_controller: CameraControllerProxy,
 }
 
 impl <'a> LoopContext<'a> {
 
-    pub fn new(event_handler: EventHandler<'a>, camera: Camera, camera_controller: CameraControllerProxy) -> LoopContext<'a> {
-        let mut ctx = LoopContext {
+    pub fn new(event_handler: EventHandler<'a>, camera: Camera) -> LoopContext<'a> {
+        LoopContext {
             event_handler,
             camera: camera,
             prepares: Vec::new(),
-            camera_controller,
-        };
-        ctx.setup();
-        ctx
+        }
     }
 
-    fn setup(&mut self) {
-
+    pub fn setup(&mut self, store: &'static LoopStore) {
+        self.prepares.push(&store.camera_controller);
     }
 
     pub fn register_prepare(&mut self, prepare: &'a impl PrepareRender) {
@@ -46,8 +42,6 @@ impl <'a> LoopContext<'a> {
     }
 
     pub fn prepare_render(&mut self, frame_duration: Duration) {
-        self.camera_controller.prepare(&mut self.camera, frame_duration);
-        
         for prepare in self.prepares.iter() {
             prepare.prepare(&mut self.camera, frame_duration);
         }

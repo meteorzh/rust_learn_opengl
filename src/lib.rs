@@ -2,11 +2,13 @@ use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self,
 
 use camera::CameraController;
 use cgmath::{Vector3, Zero, Vector2};
-use context::LoopContext;
+use context::{LoopContext, LoopStore};
 use event::{EventHandler, keyboard::KeyboardInteract, mouse::MouseInteract};
+use futures::lock::Mutex;
 use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, texture::CompressedSrgbTexture2d, program::{SourceCode, ProgramCreationInput}, Program, glutin::{event_loop::{EventLoop, ControlFlow}, event::{Event, WindowEvent, DeviceEvent, StartCause, KeyboardInput, VirtualKeyCode, ElementState}}};
 use material::{Material, MaterialLoader};
 use obj::{ObjData, ObjMaterial};
+use once_cell::sync::OnceCell;
 
 pub mod utils;
 pub mod camera;
@@ -117,13 +119,12 @@ pub fn load_wavefront_obj_as_models(display: &Display, basepath: &str, obj_file:
     models
 }
 
-
 pub enum Action {
     Stop,
     Continue,
 }
 
-pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext<'static>, mut render_func: F) 
+pub fn start_loop<F>(event_loop: EventLoop<()>, mut store: LoopStore, mut ctx: LoopContext<'static>, mut render_func: F) 
     where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext<'static>) -> Action {
 
     let mut last_frame = Instant::now();
@@ -148,10 +149,16 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext<'static>, m
                     _ => {},
                 },
                 Event::NewEvents(cause) => match cause {
-                    StartCause::ResumeTimeReached { .. } | StartCause::Init => {
+                    StartCause::ResumeTimeReached { .. } => {
                         // 帧时间限制达到后可以渲染
+                        render = true;
+                    },
+                    StartCause::Init => {
                         // 初始化时可以渲染
                         render = true;
+
+                        // 设置context
+                        // ctx.setup(&store);
                     },
                     _ => {},
                 },

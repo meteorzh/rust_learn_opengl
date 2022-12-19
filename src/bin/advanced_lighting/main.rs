@@ -9,7 +9,7 @@ use cgmath::{SquareMatrix, Point3, Matrix4};
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState, Event}, window::CursorGrabMode}};
 
-use rust_opengl_learn::{camera::{Camera, CameraController, CameraControllerProxy}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard::{handle_keyboard_input, KeyboardController}, start_loop, Action, mouse::MouseController, event::{EventHandler, keyboard::{KeyboardHandler, KeyboardInteract}, mouse::{MouseHandler, MouseInteract}}, context::LoopContext};
+use rust_opengl_learn::{camera::{Camera, CameraController, CameraControllerProxy}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard::{handle_keyboard_input, KeyboardController}, start_loop, Action, mouse::MouseController, event::{EventHandler, keyboard::{KeyboardHandler, KeyboardInteract}, mouse::{MouseHandler, MouseInteract}}, context::{LoopContext, LoopStore}};
 
 fn main() {
     let event_loop = event_loop::EventLoop::new();
@@ -35,7 +35,7 @@ fn main() {
     let floor_texture = material::load_texture("src/metal.png".to_string(), &display).1;
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
-    let mut camera = Camera::new(
+    let camera = Camera::new(
         cgmath::Point3::new(0_f32, 0_f32, 9_f32), 
         cgmath::Rad::from(cgmath::Deg(-90_f32)), 
         cgmath::Rad::from(cgmath::Deg(0_f32))
@@ -55,15 +55,19 @@ fn main() {
     };
 
     // 事件处理逻辑
-    let mut keyboard_handler = KeyboardHandler::new();
+    let keyboard_handler = KeyboardHandler::new();
 
-    let mut mouse_handler = MouseHandler::new();
+    let mouse_handler = MouseHandler::new();
 
     let event_handler = EventHandler::new(keyboard_handler, mouse_handler);
 
-    let loop_context = LoopContext::new(event_handler, camera, controller);
+    let loop_store = LoopStore {
+        camera_controller: controller
+    };
 
-    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
+    let loop_context = LoopContext::new(event_handler, camera);
+
+    start_loop(event_loop, loop_store, loop_context, move |_: Option<Event<()>>, ctx| {
         // 摄像机观察矩阵
         let view_matrix = Into::<[[f32; 4]; 4]>::into(ctx.camera.calc_matrix());
 

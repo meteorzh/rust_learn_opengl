@@ -225,6 +225,7 @@ impl CameraController {
 
 /// 摄像机控制类代理
 /// 保持摄像机控制类的内部可变性
+#[derive(Debug)]
 pub struct CameraControllerProxy {
 
     controller: RefCell<CameraController>,
