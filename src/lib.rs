@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}, future, time::{Instant, Duration}};
+use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}, future, time::{Instant, Duration}, pin::Pin};
 
 use camera::CameraController;
 use cgmath::{Vector3, Zero, Vector2};
@@ -124,8 +124,8 @@ pub enum Action {
     Continue,
 }
 
-pub fn start_loop<F>(event_loop: EventLoop<()>, mut store: LoopStore, mut ctx: LoopContext<'static>, mut render_func: F) 
-    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext<'static>) -> Action {
+pub fn start_loop<F>(event_loop: EventLoop<()>, store: Pin<Box<LoopStore>>, mut ctx: LoopContext<'static>, mut render_func: F) 
+    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext<'_>) -> Action {
 
     let mut last_frame = Instant::now();
 
@@ -158,7 +158,7 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut store: LoopStore, mut ctx: L
                         render = true;
 
                         // 设置context
-                        // ctx.setup(&store);
+                        ctx.setup(Pin::get_ref(store.as_ref()));
                     },
                     _ => {},
                 },

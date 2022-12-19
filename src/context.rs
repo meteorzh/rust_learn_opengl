@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{time::Duration, marker::PhantomPinned, pin::Pin};
 
 use glium::glutin::event::Event;
 
@@ -8,6 +8,17 @@ use crate::{event::{EventHandler, keyboard::KeyboardHandler, mouse::MouseHandler
 #[derive(Debug)]
 pub struct LoopStore {
     pub camera_controller: CameraControllerProxy,
+    _pin: PhantomPinned,
+}
+
+impl LoopStore {
+    
+    pub fn new(camera_controller: CameraControllerProxy) -> Pin<Box<Self>> {
+        Box::pin(LoopStore {
+            camera_controller,
+            _pin: PhantomPinned,
+        })
+    }
 }
 
 pub struct LoopContext<'a> {
@@ -15,6 +26,8 @@ pub struct LoopContext<'a> {
     event_handler: EventHandler<'a>,
 
     pub camera: Camera,
+
+    camera_controller: CameraControllerProxy,
 
     prepares: Vec<&'a dyn PrepareRender>,
 }
@@ -29,7 +42,7 @@ impl <'a> LoopContext<'a> {
         }
     }
 
-    pub fn setup(&mut self, store: &'static LoopStore) {
+    pub fn setup(&mut self, store: &'a LoopStore) {
         self.prepares.push(&store.camera_controller);
     }
 

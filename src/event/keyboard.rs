@@ -28,7 +28,7 @@ impl <'a> KeyboardHandler<'a> {
         }
     }
 
-    pub fn register2(&mut self, interact: &'a impl KeyboardInteract) {
+    pub fn register(&mut self, interact: &'a impl KeyboardInteract) {
         let index = self.interacts.len();
         self.interacts.push(interact);
         for keycode in interact.interact_keycodes().iter() {

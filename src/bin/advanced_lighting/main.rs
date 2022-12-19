@@ -2,7 +2,7 @@
 extern crate glium;
 extern crate cgmath;
 
-use std::{time::{self}};
+use std::{time::{self}, marker::PhantomPinned};
 
 use cgmath::{SquareMatrix, Point3, Matrix4};
 #[allow(unused_imports)]
@@ -61,9 +61,7 @@ fn main() {
 
     let event_handler = EventHandler::new(keyboard_handler, mouse_handler);
 
-    let loop_store = LoopStore {
-        camera_controller: controller
-    };
+    let loop_store = LoopStore::new(controller);
 
     let loop_context = LoopContext::new(event_handler, camera);
 
