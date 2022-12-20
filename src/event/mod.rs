@@ -1,7 +1,7 @@
 
 use glium::glutin::{event::{Event, WindowEvent, DeviceEvent}};
 
-use self::{mouse::{MouseHandler}, keyboard::{KeyboardHandler}};
+use self::{mouse::{MouseHandler, MouseInteract}, keyboard::{KeyboardHandler, KeyboardInteract}};
 
 pub mod mouse;
 pub mod keyboard;
@@ -36,5 +36,13 @@ impl <'a> EventHandler<'a> {
             },
             _ => {},
         }
+    }
+
+    pub fn register_keyboard(&mut self, interact: &'a impl KeyboardInteract) {
+        self.keyboard_handler.register(interact);
+    }
+
+    pub fn register_mouse(&mut self, interact: &'a impl MouseInteract) {
+        self.mouse_handler.register(interact);
     }
 }

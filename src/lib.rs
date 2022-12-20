@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}, future, time::{Instant, Duration}, pin::Pin};
+use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}, future, time::{Instant, Duration}, pin::Pin, borrow::BorrowMut};
 
 use camera::CameraController;
 use cgmath::{Vector3, Zero, Vector2};
@@ -124,7 +124,7 @@ pub enum Action {
     Continue,
 }
 
-pub fn start_loop<F>(event_loop: EventLoop<()>, store: Pin<Box<LoopStore>>, mut ctx: LoopContext<'static>, mut render_func: F) 
+pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: Pin<Box<LoopContext<'static>>>, mut render_func: F) 
     where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext<'_>) -> Action {
 
     let mut last_frame = Instant::now();
@@ -132,6 +132,9 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, store: Pin<Box<LoopStore>>, mut 
     event_loop.run(move |event, _, control_flow| {
         let mut render = false;
         let mut raw_event: Option<Event<()>> = None;
+        let mut_ctx = {
+            unsafe { Pin::get_unchecked_mut(Pin::as_mut(&mut ctx)) }
+        };
 
         if let Some(event) = event.to_static() {
             match &event {
@@ -149,22 +152,15 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, store: Pin<Box<LoopStore>>, mut 
                     _ => {},
                 },
                 Event::NewEvents(cause) => match cause {
-                    StartCause::ResumeTimeReached { .. } => {
+                    StartCause::ResumeTimeReached { .. } | StartCause::Init => {
                         // 帧时间限制达到后可以渲染
                         render = true;
-                    },
-                    StartCause::Init => {
-                        // 初始化时可以渲染
-                        render = true;
-
-                        // 设置context
-                        ctx.setup(Pin::get_ref(store.as_ref()));
                     },
                     _ => {},
                 },
                 _ => {},
             }
-            ctx.handle_event(&event);
+            mut_ctx.handle_event(&event);
 
             if !render {
                 return;
@@ -175,9 +171,9 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, store: Pin<Box<LoopStore>>, mut 
         let current = Instant::now();
         let frame_duration = current.duration_since(last_frame);
 
-        ctx.prepare_render(frame_duration);
+        mut_ctx.prepare_render(frame_duration);
 
-        match render_func(raw_event, &mut ctx) {
+        match render_func(raw_event, mut_ctx) {
             Action::Continue => {
                 // 下一帧时间
                 let next_frame_time = current + Duration::from_nanos(16_666_667);

@@ -241,10 +241,22 @@ impl CameraControllerProxy {
 impl KeyboardInteract for CameraControllerProxy {
 
     fn interact_keycodes(&self) -> Vec<VirtualKeyCode> {
-        vec![VirtualKeyCode::Up, VirtualKeyCode::Down, VirtualKeyCode::Left, VirtualKeyCode::Right, VirtualKeyCode::Space, VirtualKeyCode::LShift]
+        vec![
+            VirtualKeyCode::W,
+            VirtualKeyCode::A,
+            VirtualKeyCode::S,
+            VirtualKeyCode::D,
+            VirtualKeyCode::Up, 
+            VirtualKeyCode::Down, 
+            VirtualKeyCode::Left, 
+            VirtualKeyCode::Right, 
+            VirtualKeyCode::Space, 
+            VirtualKeyCode::LShift
+        ]
     }
 
     fn interact(&self, input: KeyboardInput) {
+        // println!("keyboard: {:#?}", input);
         if let Some(keycode) = input.virtual_keycode {
             self.controller.borrow_mut().process_keyboard(keycode, input.state);
         }

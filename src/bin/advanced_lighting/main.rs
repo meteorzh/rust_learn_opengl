@@ -61,11 +61,9 @@ fn main() {
 
     let event_handler = EventHandler::new(keyboard_handler, mouse_handler);
 
-    let loop_store = LoopStore::new(controller);
+    let loop_context = LoopContext::new(event_handler, camera, controller);
 
-    let loop_context = LoopContext::new(event_handler, camera);
-
-    start_loop(event_loop, loop_store, loop_context, move |_: Option<Event<()>>, ctx| {
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
         // 摄像机观察矩阵
         let view_matrix = Into::<[[f32; 4]; 4]>::into(ctx.camera.calc_matrix());
 
