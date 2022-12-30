@@ -9,7 +9,7 @@ use cgmath::{SquareMatrix, Point3, Matrix4};
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{glutin::{event::{KeyboardInput, VirtualKeyCode, ElementState, Event}, window::CursorGrabMode}};
 
-use rust_opengl_learn::{camera::{Camera, CameraController, CameraControllerProxy}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard::{handle_keyboard_input, KeyboardController}, start_loop, Action, mouse::MouseController, event::{EventHandler, keyboard::{KeyboardHandler, KeyboardInteract}, mouse::{MouseHandler, MouseInteract}}, context::{LoopContext, LoopStore}};
+use rust_opengl_learn::{camera::{Camera, CameraController, CameraControllerProxy}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, keyboard::{handle_keyboard_input, KeyboardController}, start_loop, Action, mouse::MouseController, event::{EventHandler, keyboard::{KeyboardHandler, KeyboardInteract}, mouse::{MouseHandler, MouseInteract}}, context::{LoopContext, LoopStore}, lights::PointLight};
 
 fn main() {
     let event_loop = event_loop::EventLoop::new();
@@ -21,18 +21,14 @@ fn main() {
     display.gl_window().window().set_cursor_grab(CursorGrabMode::Confined).unwrap();
     display.gl_window().window().set_cursor_visible(false);
 
-    // 物体着色器程序
-    let obj_program = create_program("src/bin/senior_opengl_depth_test/obj_shader_test.vert", "src/bin/senior_opengl_depth_test/obj_shader_test.frag", &display);
-    // 线性深度测试
-    // let obj_program = create_program("src/bin/senior_opengl_depth_test/obj_shader_test.vert", "src/bin/senior_opengl_depth_test/obj_shader_test_linear.frag", &display);
+    let obj_program = create_program("src/bin/advanced_lighting/light.vert", "src/bin/advanced_lighting/light.frag", &display);
 
-    let cube1 = Cube::new("cube1", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(-1.0, 0.0, -1.0), Matrix4::identity());
-    let cube2 = Cube::new("cube2", 1.0, &display, [1.0, 1.0, 1.0], Point3::new(2.0, 0.0, 0.0), Matrix4::identity());
-    let cubes = [cube1, cube2];
-    let plane = Plane::new("plane", 10.0, 10.0, -0.5001_f32, &display, Point3::new(0.0, 0.0, 0.0), Matrix4::identity());
+    let floor = Plane::new("plane", 10.0, 10.0, -0.5_f32, &display, Point3::new(0.0, 0.0, 0.0), Matrix4::identity());
 
-    let cube_texture = material::load_texture("src/marble.jpg".to_string(), &display).1;
-    let floor_texture = material::load_texture("src/metal.png".to_string(), &display).1;
+    let floor_texture = material::load_texture("src/wood.png".to_string(), &display).1;
+
+    // 点光源
+    let point_light = PointLight::new([0.0, 0.0, 0.0], 0.0, 0.0, 0.0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]);
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let camera = Camera::new(
@@ -71,27 +67,16 @@ fn main() {
 
         // drawing a frame
         let mut target = display.draw();
-        // target.clear_color(0.2, 0.3, 0.3, 1.0);
         target.clear_color_and_depth((0.05, 0.05, 0.05, 1.0), 1.0);
         
-        let mut box_uniforms = DynamicUniforms::new();
-        box_uniforms.add(String::from("view"), &view_matrix);
-        box_uniforms.add(String::from("projection"), &projection_matrix);
-        box_uniforms.add(String::from("viewPos"), &camera_position);
-        
-        // 循环渲染模型
-        for cube in cubes.iter() {
-            let mut uniforms = box_uniforms.clone();
-            let model = Into::<[[f32; 4]; 4]>::into(cube.position_matrix() * cube.model);
-            uniforms.add_str_key("model", &model);
-            uniforms.add_str_key("texture1", &cube_texture);
-            target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
-        }
+        let mut uniforms = DynamicUniforms::new();
+        uniforms.add(String::from("view"), &view_matrix);
+        uniforms.add(String::from("projection"), &projection_matrix);
+        uniforms.add(String::from("viewPos"), &camera_position);
+        point_light.add_to_uniforms("light", &mut uniforms);
 
-        let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model(Matrix4::identity()));
-        box_uniforms.add_str_key("model", &model);
-        box_uniforms.add_str_key("texture1", &floor_texture);
-        target.draw(&plane.vertex_buffer, &plane.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
+        uniforms.add_str_key("floorTexture", &floor_texture);
+        target.draw(&floor.vertex_buffer, &floor.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
 
         target.finish().unwrap();
 
