@@ -9,7 +9,7 @@ use cgmath::{prelude::*};
 use glium::glutin::dpi::PhysicalPosition;
 use glium::glutin::event::{VirtualKeyCode, ElementState, MouseScrollDelta, Event, WindowEvent, DeviceEvent, KeyboardInput};
 
-use crate::context::PrepareRender;
+use crate::context::{PrepareRender, LoopContext};
 use crate::event::keyboard::KeyboardInteract;
 use crate::event::mouse::MouseInteract;
 
@@ -255,7 +255,7 @@ impl KeyboardInteract for CameraControllerProxy {
         ]
     }
 
-    fn interact(&self, input: KeyboardInput) {
+    fn interact(&self, input: KeyboardInput, ctx: &mut LoopContext) {
         // println!("keyboard: {:#?}", input);
         if let Some(keycode) = input.virtual_keycode {
             self.controller.borrow_mut().process_keyboard(keycode, input.state);

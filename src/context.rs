@@ -1,8 +1,8 @@
-use std::{time::Duration, marker::PhantomPinned, pin::Pin, ptr::NonNull};
+use std::{time::Duration, marker::PhantomPinned, pin::Pin, ptr::NonNull, collections::HashMap};
 
 use glium::glutin::event::Event;
 
-use crate::{event::{EventHandler, keyboard::KeyboardHandler, mouse::MouseHandler}, camera::{Camera, CameraControllerProxy}};
+use crate::{event::{EventHandler, keyboard::{KeyboardHandler, KeyboardInteract}, mouse::MouseHandler}, camera::{Camera, CameraControllerProxy, CameraController}};
 
 
 #[derive(Debug)]
@@ -21,59 +21,61 @@ impl LoopStore {
     }
 }
 
-pub struct LoopContext<'a> {
+pub enum ContextValue {
+    F32(f32),
+}
 
-    event_handler: EventHandler<'a>,
+pub struct LoopContext {
 
     pub camera: Camera,
 
-    camera_controller: CameraControllerProxy,
+    camera_controller: CameraController,
 
-    prepares: Vec<&'a dyn PrepareRender>,
+    store: HashMap<String, ContextValue>,
 
-    _pin: PhantomPinned,
+    keyboard_handler: KeyboardHandler,
 }
 
-impl <'a> LoopContext<'a> {
+impl LoopContext {
 
-    pub fn new(event_handler: EventHandler<'a>, camera: Camera, camera_controller: CameraControllerProxy) -> Pin<Box<LoopContext<'a>>> {
-        let ctx = LoopContext {
-            event_handler,
-            camera: camera,
+    pub fn new(camera: Camera, camera_controller: CameraController) -> LoopContext {
+        LoopContext {
+            camera,
             camera_controller,
-            prepares: Vec::new(),
-            _pin: PhantomPinned,
-        };
-        let mut ctx = Box::pin(ctx);
-        let cc = NonNull::from(&ctx.camera_controller);
-
-        unsafe {
-            let mut_ref = Pin::as_mut(&mut ctx);
-            let mut_ctx = Pin::get_unchecked_mut(mut_ref);
-            mut_ctx.register_prepare(cc.as_ref());
-            mut_ctx.event_handler.register_keyboard(cc.as_ref());
-            mut_ctx.event_handler.register_mouse(cc.as_ref());
+            store: HashMap::new(),
+            keyboard_handler: KeyboardHandler::new(),
         }
-        
-        ctx
     }
 
-    pub fn setup(&mut self, store: &'a LoopStore) {
-        self.prepares.push(&store.camera_controller);
-    }
+    // pub fn setup(&mut self, store: &'a LoopStore) {
+    //     self.prepares.push(&store.camera_controller);
+    // }
 
-    pub fn register_prepare(&mut self, prepare: &'a impl PrepareRender) {
-        self.prepares.push(prepare);
+    // pub fn register_prepare(&mut self, prepare: &'a impl PrepareRender) {
+    //     self.prepares.push(prepare);
+    // }
+
+    pub fn register_keyboard(&mut self, keyboard_interact: Box<dyn KeyboardInteract>) {
+        self.keyboard_handler.register(keyboard_interact);
     }
 
     pub fn handle_event(&mut self, event: &Event<()>) {
-        self.event_handler.handle(event);
+        // self.event_handler.handle(event);
+
     }
 
     pub fn prepare_render(&mut self, frame_duration: Duration) {
-        for prepare in self.prepares.iter() {
-            prepare.prepare(&mut self.camera, frame_duration);
-        }
+    //     for prepare in self.prepares.iter() {
+    //         prepare.prepare(&mut self.camera, frame_duration);
+    //     }
+    }
+
+    pub fn get_from_store(&self, key: &str) -> Option<&ContextValue> {
+        self.store.get(key)
+    }
+
+    pub fn set_to_store(&mut self, key: &str, value: ContextValue) {
+        self.store.insert(key.to_string(), value);
     }
 }
 

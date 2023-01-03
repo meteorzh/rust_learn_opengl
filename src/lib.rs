@@ -124,17 +124,14 @@ pub enum Action {
     Continue,
 }
 
-pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: Pin<Box<LoopContext<'static>>>, mut render_func: F) 
-    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext<'_>) -> Action {
+pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext, mut render_func: F) 
+    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext) -> Action {
 
     let mut last_frame = Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
         let mut render = false;
         let mut raw_event: Option<Event<()>> = None;
-        let mut_ctx = {
-            unsafe { Pin::get_unchecked_mut(Pin::as_mut(&mut ctx)) }
-        };
 
         if let Some(event) = event.to_static() {
             match &event {
@@ -160,7 +157,7 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: Pin<Box<LoopContext<'st
                 },
                 _ => {},
             }
-            mut_ctx.handle_event(&event);
+            ctx.handle_event(&event);
 
             if !render {
                 return;
@@ -171,9 +168,9 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: Pin<Box<LoopContext<'st
         let current = Instant::now();
         let frame_duration = current.duration_since(last_frame);
 
-        mut_ctx.prepare_render(frame_duration);
+        ctx.prepare_render(frame_duration);
 
-        match render_func(raw_event, mut_ctx) {
+        match render_func(raw_event, &mut ctx) {
             Action::Continue => {
                 // 下一帧时间
                 let next_frame_time = current + Duration::from_nanos(16_666_667);
