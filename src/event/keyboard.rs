@@ -2,16 +2,15 @@ use std::collections::HashMap;
 
 use glium::glutin::event::{VirtualKeyCode, KeyboardInput};
 
-use crate::context::LoopContext;
-
-
 
 /// 键盘交互特征
 pub trait KeyboardInteract {
 
+    fn init(&self);
+
     fn interact_keycodes(&self) -> Vec<VirtualKeyCode>;
 
-    fn interact(&self, input: KeyboardInput, ctx: &mut LoopContext);
+    fn interact(&self, input: KeyboardInput);
 }
 
 pub struct KeyboardHandler {
@@ -31,6 +30,7 @@ impl KeyboardHandler {
     }
 
     pub fn register(&mut self, interact: Box<dyn KeyboardInteract>) {
+        interact.init();
         let index = self.interacts.len();
         for keycode in interact.interact_keycodes().iter() {
             self.interact_map.insert(*keycode, index);
@@ -38,16 +38,14 @@ impl KeyboardHandler {
         self.interacts.push(interact);
     }
 
-    pub fn process_keyboard(&self, input: KeyboardInput, ctx: &mut LoopContext) {
+    pub fn process_keyboard(&self, input: KeyboardInput) {
         if let Some(code) = input.virtual_keycode {
             if let Some(index) = self.interact_map.get(&code) {
                 if let Some(interact) = self.interacts.get(*index) {
-                    (*interact).interact(input, ctx);
+                    (*interact).interact(input);
                 } else {
                     println!("error: no interact found for keycode {:#?}", code);
                 }
-            } else {
-                println!("unsupported keyboard input: {:#?}", code);
             }
         } else {
             println!("no virtual keycode found!");

@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-use std::cell::RefCell;
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
 
@@ -7,11 +5,7 @@ use cgmath::{Point3, Rad, Matrix4, Vector3};
 
 use cgmath::{prelude::*};
 use glium::glutin::dpi::PhysicalPosition;
-use glium::glutin::event::{VirtualKeyCode, ElementState, MouseScrollDelta, Event, WindowEvent, DeviceEvent, KeyboardInput};
-
-use crate::context::{PrepareRender, LoopContext};
-use crate::event::keyboard::KeyboardInteract;
-use crate::event::mouse::MouseInteract;
+use glium::glutin::event::{VirtualKeyCode, ElementState, MouseScrollDelta, Event, WindowEvent, DeviceEvent};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
@@ -223,60 +217,64 @@ impl CameraController {
 }
 
 
-/// 摄像机控制类代理
-/// 保持摄像机控制类的内部可变性
-#[derive(Debug)]
-pub struct CameraControllerProxy {
+// /// 摄像机控制类代理
+// /// 保持摄像机控制类的内部可变性
+// #[derive(Debug)]
+// pub struct CameraControllerProxy {
 
-    controller: RefCell<CameraController>,
-}
+//     controller: RefCell<CameraController>,
+// }
 
-impl CameraControllerProxy {
+// impl CameraControllerProxy {
 
-    pub fn new(controller: CameraController) -> CameraControllerProxy {
-        CameraControllerProxy { controller: RefCell::new(controller) }
-    }
-}
+//     pub fn new(controller: CameraController) -> CameraControllerProxy {
+//         CameraControllerProxy { controller: RefCell::new(controller) }
+//     }
+// }
 
-impl KeyboardInteract for CameraControllerProxy {
+// impl KeyboardInteract for CameraControllerProxy {
 
-    fn interact_keycodes(&self) -> Vec<VirtualKeyCode> {
-        vec![
-            VirtualKeyCode::W,
-            VirtualKeyCode::A,
-            VirtualKeyCode::S,
-            VirtualKeyCode::D,
-            VirtualKeyCode::Up, 
-            VirtualKeyCode::Down, 
-            VirtualKeyCode::Left, 
-            VirtualKeyCode::Right, 
-            VirtualKeyCode::Space, 
-            VirtualKeyCode::LShift
-        ]
-    }
+//     fn init(&self) {
+        
+//     }
 
-    fn interact(&self, input: KeyboardInput, ctx: &mut LoopContext) {
-        // println!("keyboard: {:#?}", input);
-        if let Some(keycode) = input.virtual_keycode {
-            self.controller.borrow_mut().process_keyboard(keycode, input.state);
-        }
-    }
-}
+//     fn interact_keycodes(&self) -> Vec<VirtualKeyCode> {
+//         vec![
+//             VirtualKeyCode::W,
+//             VirtualKeyCode::A,
+//             VirtualKeyCode::S,
+//             VirtualKeyCode::D,
+//             VirtualKeyCode::Up, 
+//             VirtualKeyCode::Down, 
+//             VirtualKeyCode::Left, 
+//             VirtualKeyCode::Right, 
+//             VirtualKeyCode::Space, 
+//             VirtualKeyCode::LShift
+//         ]
+//     }
 
-impl MouseInteract for CameraControllerProxy {
+//     fn interact(&self, input: KeyboardInput) {
+//         // println!("keyboard: {:#?}", input);
+//         if let Some(keycode) = input.virtual_keycode {
+//             self.controller.borrow_mut().process_keyboard(keycode, input.state);
+//         }
+//     }
+// }
 
-    fn motion_interact(&self, delta: (f64, f64)) {
-        self.controller.borrow_mut().process_mouse(delta.0, delta.1);
-    }
+// impl MouseInteract for CameraControllerProxy {
 
-    fn wheel_interact(&self, delta: MouseScrollDelta) {
-        self.controller.borrow_mut().process_scroll(&delta);
-    }
-}
+//     fn motion_interact(&self, delta: (f64, f64)) {
+//         self.controller.borrow_mut().process_mouse(delta.0, delta.1);
+//     }
 
-impl PrepareRender for CameraControllerProxy {
+//     fn wheel_interact(&self, delta: MouseScrollDelta) {
+//         self.controller.borrow_mut().process_scroll(&delta);
+//     }
+// }
 
-    fn prepare(&self, camera: &mut Camera, frame_duration: Duration) {
-        self.controller.borrow_mut().update_camera(camera, frame_duration);
-    }
-}
+// impl PrepareRender for CameraControllerProxy {
+
+//     fn prepare(&self, camera: &mut Camera, frame_duration: Duration) {
+//         self.controller.borrow_mut().update_camera(camera, frame_duration);
+//     }
+// }

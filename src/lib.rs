@@ -1,14 +1,11 @@
-use std::{collections::{HashMap, hash_map::Entry}, rc::Rc, sync::Arc, fs::{self, File}, io::{Cursor, BufReader}, future, time::{Instant, Duration}, pin::Pin, borrow::BorrowMut};
+use std::{collections::{HashMap}, rc::Rc, fs::{self}, time::{Instant, Duration}};
 
-use camera::CameraController;
 use cgmath::{Vector3, Zero, Vector2};
-use context::{LoopContext, LoopStore};
-use event::{EventHandler, keyboard::KeyboardInteract, mouse::MouseInteract};
-use futures::lock::Mutex;
-use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, texture::CompressedSrgbTexture2d, program::{SourceCode, ProgramCreationInput}, Program, glutin::{event_loop::{EventLoop, ControlFlow}, event::{Event, WindowEvent, DeviceEvent, StartCause, KeyboardInput, VirtualKeyCode, ElementState}}};
+use context::{LoopContext};
+
+use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, program::{SourceCode, ProgramCreationInput}, Program, glutin::{event_loop::{EventLoop, ControlFlow}, event::{Event, WindowEvent, StartCause, KeyboardInput, VirtualKeyCode, ElementState}}};
 use material::{Material, MaterialLoader};
-use obj::{ObjData, ObjMaterial};
-use once_cell::sync::OnceCell;
+use obj::{ObjMaterial};
 
 pub mod utils;
 pub mod camera;
@@ -119,11 +116,15 @@ pub fn load_wavefront_obj_as_models(display: &Display, basepath: &str, obj_file:
     models
 }
 
+/// 渲染结果的动作
 pub enum Action {
+    /// 停止渲染
     Stop,
+    /// 继续渲染
     Continue,
 }
 
+/// 开始渲染循环
 pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext, mut render_func: F) 
     where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext) -> Action {
 
