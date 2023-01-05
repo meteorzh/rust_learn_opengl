@@ -55,6 +55,7 @@ fn main() {
             light_boxes.push(Cube::new("light", 0.7_f32, &display, light_color, Point3::from(position), Matrix4::<f32>::identity()));
             point_lights.push(PointLight::new(
                 position, 
+                [1.0, 1.0, 1.0],
                 1.0_f32, 
                 0.09_f32, 
                 0.032_f32, 

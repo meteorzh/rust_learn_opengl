@@ -32,6 +32,8 @@ impl DirLight {
 pub struct PointLight {
     position: [f32; 3],
 
+    color: [f32; 3],
+
     constant: f32,
     linear: f32,
     quadratic: f32,
@@ -42,9 +44,23 @@ pub struct PointLight {
 }
 
 impl PointLight {
-    pub fn new(position: [f32; 3], constant: f32, linear: f32, quadratic: f32, ambient: [f32; 3], diffuse: [f32; 3], specular: [f32; 3]) -> PointLight {
+    pub fn new_simple(position: [f32; 3], color: [f32; 3]) -> Self {
+        Self {
+            position: position,
+            color,
+            constant: 0.0,
+            linear: 0.0,
+            quadratic: 0.0,
+            ambient: [0.0, 0.0, 0.0],
+            diffuse: [0.0, 0.0, 0.0],
+            specular: [0.0, 0.0, 0.0],
+        }
+    }
+
+    pub fn new(position: [f32; 3], color: [f32; 3], constant: f32, linear: f32, quadratic: f32, ambient: [f32; 3], diffuse: [f32; 3], specular: [f32; 3]) -> PointLight {
         PointLight {
             position: position,
+            color,
             constant: constant,
             linear: linear,
             quadratic: quadratic,
@@ -56,6 +72,7 @@ impl PointLight {
 
     pub fn add_to_uniforms<'a: 'b, 'b>(&'a self, light_key: &str, uniforms: &'b mut DynamicUniforms<'a>) {
         add_to_uniforms(light_key, ".position", &self.position, uniforms);
+        add_to_uniforms(light_key, ".color", &self.color, uniforms);
         add_to_uniforms(light_key, ".constant", &self.constant, uniforms);
         add_to_uniforms(light_key, ".linear", &self.linear, uniforms);
         add_to_uniforms(light_key, ".quadratic", &self.quadratic, uniforms);
