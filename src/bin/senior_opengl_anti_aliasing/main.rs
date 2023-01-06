@@ -117,7 +117,7 @@ fn main() {
         uniforms.add_str_key("view", &view_matrix);
         uniforms.add_str_key("projection", &projection_matrix);
 
-        let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model(Matrix4::identity()));
+        let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model());
         uniforms.add_str_key("model", &model);
         
         // 循环渲染模型

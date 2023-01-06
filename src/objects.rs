@@ -139,8 +139,12 @@ impl Cube {
         Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z))
     }
 
-    pub fn calc_model(&self, other: Matrix4<f32>) -> Matrix4<f32> {
+    pub fn calc_model_with(&self, other: Matrix4<f32>) -> Matrix4<f32> {
         Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z)) * other * self.model
+    }
+
+    pub fn calc_model(&self) -> Matrix4<f32> {
+        Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z)) * self.model
     }
 }
 
@@ -180,8 +184,12 @@ impl Plane {
         }
     }
 
-    pub fn calc_model(&self, other: Matrix4<f32>) -> Matrix4<f32> {
+    pub fn calc_model_with(&self, other: Matrix4<f32>) -> Matrix4<f32> {
         Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z)) * other * self.model
+    }
+
+    pub fn calc_model(&self) -> Matrix4<f32> {
+        Matrix4::from_translation(Vector3::new(self.position.x, self.position.y, self.position.z)) * self.model
     }
 
     pub fn new_vertical_plane(id: &str, height: f32, width: f32, display: &glium::Display, position: Point3<f32>, model: Matrix4<f32>) -> Plane {

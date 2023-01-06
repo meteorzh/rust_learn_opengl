@@ -151,7 +151,7 @@ fn main() {
         box_uniforms.add(String::from("projection"), &projection_matrix);
         box_uniforms.add(String::from("viewPos"), &camera_position);
 
-        let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model(Matrix4::identity()));
+        let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model());
         box_uniforms.add_str_key("model", &model);
         box_uniforms.add_str_key("texture1", &floor_texture);
         target.draw(&plane.vertex_buffer, &plane.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
@@ -160,7 +160,7 @@ fn main() {
         box_uniforms.add_str_key("texture1", &cube_texture);
         for cube in cubes.iter() {
             let mut uniforms = box_uniforms.clone();
-            let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model(Matrix4::identity()));
+            let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model());
             uniforms.add_str_key("model", &model);
             target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
         }
@@ -174,7 +174,7 @@ fn main() {
         // 根据窗户到摄像机的距离，由远到近渲染
         for grass in grasses.iter() {
             let mut uniforms = box_uniforms.clone();
-            let model = Into::<[[f32; 4]; 4]>::into(grass.calc_model(Matrix4::identity()));
+            let model = Into::<[[f32; 4]; 4]>::into(grass.calc_model());
             uniforms.add_str_key("model", &model);
             target.draw(&grass.vertex_buffer, &grass.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
         }

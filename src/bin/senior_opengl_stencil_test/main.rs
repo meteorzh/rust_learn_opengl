@@ -194,7 +194,7 @@ fn main() {
         }
 
         // 绘制地板
-        let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model(Matrix4::identity()));
+        let model = Into::<[[f32; 4]; 4]>::into(plane.calc_model());
         box_uniforms.add_str_key("model", &model);
         box_uniforms.add_str_key("texture1", &floor_texture);
         target.draw(&plane.vertex_buffer, &plane.index_buffer, &obj_program, &box_uniforms, &draw_params).unwrap();

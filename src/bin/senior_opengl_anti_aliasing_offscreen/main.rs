@@ -120,7 +120,7 @@ fn main() {
         uniforms.add_str_key("view", &view_matrix);
         uniforms.add_str_key("projection", &projection_matrix);
 
-        let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model(Matrix4::identity()));
+        let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model());
         uniforms.add_str_key("model", &model);
 
         target.draw(&cube.vertex_buffer, &cube.index_buffer, &program, &uniforms, &draw_parameters).unwrap();

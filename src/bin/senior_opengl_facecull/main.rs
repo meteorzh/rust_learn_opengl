@@ -128,7 +128,7 @@ fn main() {
         
         // 箱子纹理
         box_uniforms.add_str_key("texture1", &cube_texture);
-        let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model(Matrix4::identity()));
+        let model = Into::<[[f32; 4]; 4]>::into(cube.calc_model());
         box_uniforms.add_str_key("model", &model);
         target.draw(&cube.vertex_buffer, &cube.index_buffer, &obj_program, &box_uniforms, &draw_parameters).unwrap();
 
