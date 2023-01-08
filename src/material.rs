@@ -1,7 +1,7 @@
 use std::{rc::Rc, collections::HashMap, sync::Arc, io::Cursor, fs};
 
 use futures::{executor::{block_on, ThreadPool, ThreadPoolBuilder}};
-use glium::{texture::{CompressedSrgbTexture2d, SrgbCubemap, CubeLayer, RawImage2d}, Display, framebuffer::{SimpleFrameBuffer}, Texture2d, Surface, BlitTarget, uniforms::MagnifySamplerFilter};
+use glium::{texture::{CompressedSrgbTexture2d, DepthCubemap, DepthTexture2d, SrgbCubemap, CubeLayer, RawImage2d}, Display, framebuffer::{SimpleFrameBuffer}, Texture2d, Surface, BlitTarget, uniforms::MagnifySamplerFilter};
 use obj::Mtl;
 
 use crate::{uniforms::{DynamicUniforms, add_to_uniforms}, utils};
@@ -256,4 +256,17 @@ pub fn load_cubemap(dir: &str, suffix: &str, display: &Display, dimensions: i32)
     }
 
     cube_texture
+}
+
+pub fn depth_cubemap(display: &Display, dimensions: u32) -> DepthCubemap {
+    let cube = DepthCubemap::empty(display, dimensions).unwrap();
+
+    for item in CUBEMAP_FILES.iter() {
+        let texture = DepthTexture2d::empty(display, dimensions, dimensions).unwrap();
+        let framebuffer = SimpleFrameBuffer::depth_only(display, cube.main_level().image(item.1)).unwrap();
+
+        
+    }
+
+    cube
 }
