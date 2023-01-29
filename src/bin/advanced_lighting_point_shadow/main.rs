@@ -2,12 +2,12 @@
 extern crate glium;
 extern crate cgmath;
 
-use cgmath::{SquareMatrix, Point3, Matrix4, Vector3, Rad, InnerSpace};
+use cgmath::{Point3, Matrix4, Vector3, Rad, InnerSpace, Deg};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{glutin::{event::{Event}, window::CursorGrabMode, dpi::LogicalSize}, framebuffer::SimpleFrameBuffer, texture::{DepthCubemap}, uniforms::{UniformValue}};
+use glium::{glutin::{event::{Event, VirtualKeyCode, KeyboardInput, ElementState}, window::CursorGrabMode, dpi::LogicalSize}, framebuffer::SimpleFrameBuffer, texture::{DepthCubemap}, uniforms::{UniformValue, Sampler, MagnifySamplerFilter, SamplerWrapFunction, MinifySamplerFilter}};
 
-use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, Plane}, material, create_program, start_loop, Action, context::{LoopContext}};
+use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube}, material, create_program, start_loop, Action, context::{LoopContext, CONTEXT_STORE, ContextValue}, create_program_vgf, event::keyboard::KeyboardInteract};
 
 /// 点光源阴影映射demo
 fn main() {
@@ -20,29 +20,58 @@ fn main() {
     display.gl_window().window().set_cursor_grab(CursorGrabMode::Confined).unwrap();
     display.gl_window().window().set_cursor_visible(false);
 
-    let obj_program = create_program("src/bin/advanced_lighting_shadow_mapping/formal.vert", "src/bin/advanced_lighting_shadow_mapping/formal.frag", &display);
-    let shadow_program = create_program("src/bin/advanced_lighting_shadow_mapping/shadow.vert", "src/bin/advanced_lighting_shadow_mapping/shadow.frag", &display);
-    let debug_program = create_program("src/bin/advanced_lighting_shadow_mapping/debug_quad.vert", "src/bin/advanced_lighting_shadow_mapping/debug_quad.frag", &display);
+    let obj_program = create_program("src/bin/advanced_lighting_point_shadow/formal.vert", "src/bin/advanced_lighting_point_shadow/formal.frag", &display);
+    let shadow_program = create_program_vgf("src/bin/advanced_lighting_point_shadow/shadow.vert", "src/bin/advanced_lighting_point_shadow/shadow.geom", "src/bin/advanced_lighting_point_shadow/shadow.frag", &display);
 
-    // 地板
-    let floor = Plane::new("plane", 50.0, 50.0, -0.5_f32, &display, Point3::new(0.0, 0.0, 0.0), Matrix4::identity());
+    let texture = material::load_texture("src/wood.png".to_string(), &display).1;
 
-    let floor_texture = material::load_texture("src/wood.png".to_string(), &display).1;
+    let outter_cube = Cube::new_skybox("cube0", 10.0, &display);
 
     // 正方体
     let cubes = vec![
-        Cube::new("cube1", 2.0, &display, [0.0, 0.0, 0.0], Point3::new(0.0, 1.5, 0.0), Matrix4::from_scale(0.5)),
-        Cube::new("cube2", 2.0, &display, [0.0, 0.0, 0.0], Point3::new(2.0, 0.0, 1.0), Matrix4::from_scale(0.5)),
-        Cube::new("cube3", 2.0, &display, [0.0, 0.0, 0.0], Point3::new(-1.0, 0.0, 2.0), Matrix4::from_axis_angle(Vector3::new(1.0, 0.0, 1.0).normalize(), Rad(60.0)) * Matrix4::from_scale(0.25))
+        Cube::new("cube1", 2.0, &display, [0.0, 0.0, 0.0], Point3::new(4.0, -3.5, 0.0), Matrix4::from_scale(0.5)),
+        Cube::new("cube2", 2.0, &display, [0.0, 0.0, 0.0], Point3::new(2.0, 3.0, 1.0), Matrix4::from_scale(0.75)),
+        Cube::new("cube3", 2.0, &display, [0.0, 0.0, 0.0], Point3::new(-3.0, -1.0, 0.0), Matrix4::from_scale(0.5)),
+        Cube::new("cube4", 2.0, &display, [0.0, 0.0, 0.0], Point3::new(-1.5, 1.0, 1.5), Matrix4::from_scale(0.5)),
+        Cube::new("cube5", 2.0, &display, [0.0, 0.0, 0.0], Point3::new(-1.5, 2.0, -3.0), Matrix4::from_axis_angle(Vector3::new(1.0, 0.0, 1.0).normalize(), Rad(60.0)) * Matrix4::from_scale(0.75))
     ];
 
     // 阴影贴图
-    // ? depthcubemap 里面的textureany如何转为textureanyimage再转为DepthAttachment
-    let shadow_cubemap = DepthCubemap::empty(&display, 1024).unwrap();
-    let shadow_texture = shadow_cubemap.resident().unwrap();
+    let shadow_size: f32 = 1024.0;
+    let shadow_cubemap = DepthCubemap::empty(&display, shadow_size as u32).unwrap();
 
     // 光源视角位置
-    let light_view_position: [f32; 3] = [-2.0, 4.0, -1.0];
+    let light_view_position = Point3::new(0.0, 0.0, 0.0);
+
+    // 本例中光源为平行定向光，所以使用正交投影矩阵，这样透视图不会变形
+    let light_far_plane: f32 = 25.0;
+    let light_projection = cgmath::perspective(Deg(90.0), shadow_size / shadow_size, 1.0, light_far_plane);
+    // 光空间矩阵
+    let light_space_matrixes: Vec<[[f32; 4]; 4]> = {
+        let mut arr: Vec<[[f32; 4]; 4]> = Vec::with_capacity(6);
+        // 根据cubemap各个面的观察矩阵创建各面的光空间变换矩阵
+        // right
+        let light_view = Matrix4::look_at_rh(light_view_position, light_view_position + Vector3::new(1.0, 0.0, 0.0), -Vector3::unit_y());
+        arr.push((light_projection * light_view).into());
+        // left
+        let light_view = Matrix4::look_at_rh(light_view_position, light_view_position + Vector3::new(-1.0, 0.0, 0.0), -Vector3::unit_y());
+        arr.push((light_projection * light_view).into());
+        // top
+        let light_view = Matrix4::look_at_rh(light_view_position, light_view_position + Vector3::new(0.0, 1.0, 0.0), Vector3::unit_z());
+        arr.push((light_projection * light_view).into());
+        // bottom
+        let light_view = Matrix4::look_at_rh(light_view_position, light_view_position + Vector3::new(0.0, -1.0, 0.0), -Vector3::unit_z());
+        arr.push((light_projection * light_view).into());
+        // near
+        let light_view = Matrix4::look_at_rh(light_view_position, light_view_position + Vector3::new(0.0, 0.0, 1.0), -Vector3::unit_y());
+        arr.push((light_projection * light_view).into());
+        // far
+        let light_view = Matrix4::look_at_rh(light_view_position, light_view_position + Vector3::new(0.0, 0.0, -1.0), -Vector3::unit_y());
+        arr.push((light_projection * light_view).into());
+
+        arr
+        
+    };
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let camera = Camera::new(
@@ -52,7 +81,7 @@ fn main() {
     );
     let controller = CameraController::new(1_f32, 0.5_f32);
     // 摄像机透视矩阵
-    let projection_matrix = Into::<[[f32; 4]; 4]>::into(cgmath::perspective(cgmath::Deg(45.0), size.width as f32 / size.height as f32, 0.1_f32, 100.0));
+    let projection_matrix: [[f32; 4]; 4] = cgmath::perspective(cgmath::Deg(45.0), size.width as f32 / size.height as f32, 0.1_f32, 100.0).into();
 
     let draw_parameters = glium::DrawParameters {
         depth: glium::Depth {
@@ -63,29 +92,25 @@ fn main() {
         .. Default::default()
     };
 
-    let loop_context = LoopContext::new(camera, controller);
+    let mut loop_context = LoopContext::new(camera, controller);
+    loop_context.register_keyboard(Box::new(KeyboardInteractor{}));
 
     start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
-        let floor_model = UniformValue::Mat4(floor.calc_model().into());
-
-        // 首先在光源的视角渲染一个帧缓冲，用于创建深度贴图
-        // 本例中光源为平行定向光，所以使用正交投影矩阵，这样透视图不会变形
-        let light_projection = cgmath::ortho(-10.0, 10.0, -10.0, 10.0, 1.0, 7.5);
-        // 创建光源的视图矩阵，从光源的位置看向场景中央
-        let light_view = Matrix4::look_at_rh(light_view_position.into(), Point3::new(0.0, 0.0, 0.0), Vector3::unit_y());
-        // 光空间矩阵
-        let light_space_matrix: [[f32; 4]; 4] = (light_projection * light_view).into();
-
         // 创建深度贴图的帧缓冲
-        let mut depth_framebuffer = SimpleFrameBuffer::depth_only(&display, &shadow_texture).unwrap();
+        let mut depth_framebuffer = SimpleFrameBuffer::depth_only(&display, &shadow_cubemap).unwrap();
         depth_framebuffer.clear_color_and_depth((1.0, 1.0, 1.0, 1.0), 1.0);
 
         // 渲染场景到帧缓冲
         let mut uniforms = DynamicUniforms::new();
-        uniforms.add_str_key("lightSpaceMatrix", &light_space_matrix);
-        // floor
-        uniforms.add_str_key_value("model", floor_model);
-        depth_framebuffer.draw(&floor.vertex_buffer, &floor.index_buffer, &shadow_program, &uniforms, &draw_parameters).unwrap();
+        for (i, light_space_matrix) in light_space_matrixes.iter().enumerate() {
+            let light_key = format!("lightSpaceMatrixes[{}]", i);
+            uniforms.add(light_key, light_space_matrix);
+        }
+        uniforms.add_str_key("far_plane", &light_far_plane);
+        uniforms.add_str_key_value("lightPos", UniformValue::Vec3(light_view_position.into()));
+        
+        uniforms.add_str_key_value("model", UniformValue::Mat4(outter_cube.calc_model().into()));
+        depth_framebuffer.draw(&outter_cube.vertex_buffer, &outter_cube.index_buffer, &shadow_program, &uniforms, &draw_parameters).unwrap();
         // cubes
         for cube in &cubes {
             uniforms.add_str_key_value("model", UniformValue::Mat4(cube.calc_model().into()));
@@ -103,16 +128,19 @@ fn main() {
         uniforms.add_str_key("projection", &projection_matrix);
         uniforms.add_str_key("view", &view_matrix);
         uniforms.add_str_key("viewPos", &camera_position);
-        uniforms.add_str_key("lightPos", &light_view_position);
-        uniforms.add_str_key("diffuseTexture", &floor_texture);
+        uniforms.add_str_key("diffuseTexture", &texture);
 
-        // let shadow_sampler = Sampler::new(&shadow_texture).magnify_filter(MagnifySamplerFilter::Nearest)
-        //     .minify_filter(MinifySamplerFilter::Nearest).wrap_function(SamplerWrapFunction::Clamp);
-        // uniforms.add_str_key("shadowMap", &shadow_sampler);
+        let shadow_sampler = Sampler::new(&shadow_cubemap).magnify_filter(MagnifySamplerFilter::Nearest)
+            .minify_filter(MinifySamplerFilter::Nearest).wrap_function(SamplerWrapFunction::Clamp);
+        uniforms.add_str_key("depthMap", &shadow_sampler);
 
-        // floor
-        uniforms.add_str_key_value("model", floor_model);
-        target.draw(&floor.vertex_buffer, &floor.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
+        let store = CONTEXT_STORE.lock().unwrap();
+        if let Some(ContextValue::BOOL(v)) = store.get_value("shadows") {
+            uniforms.add_str_key("shadows", v);
+        }
+
+        uniforms.add_str_key_value("model", UniformValue::Mat4(outter_cube.calc_model().into()));
+        target.draw(&outter_cube.vertex_buffer, &outter_cube.index_buffer, &obj_program, &uniforms, &draw_parameters).unwrap();
         // cubes
         for cube in &cubes {
             let model: [[f32; 4]; 4] = cube.calc_model().into();
@@ -124,4 +152,29 @@ fn main() {
 
         Action::Continue
     });
+}
+
+
+pub struct KeyboardInteractor;
+
+impl KeyboardInteract for KeyboardInteractor {
+
+    fn init(&self) {
+        CONTEXT_STORE.lock().unwrap().set_value("shadows", ContextValue::BOOL(false))
+    }
+
+    fn interact_keycodes(&self) -> Vec<VirtualKeyCode> {
+        vec![VirtualKeyCode::F]
+    }
+
+    fn interact(&self, input: KeyboardInput) {
+        if input.state == ElementState::Released {
+            let mut store = CONTEXT_STORE.lock().unwrap();
+            let blinn = store.get_value("shadows");
+            if let Some(ContextValue::BOOL(v)) = blinn {
+                let v = *v;
+                store.set_value("shadows", ContextValue::BOOL(!v));
+            }
+        }
+    }
 }
