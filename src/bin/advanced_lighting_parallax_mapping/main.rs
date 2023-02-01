@@ -9,7 +9,7 @@ use glium::{glutin::{event::{Event}, window::CursorGrabMode, dpi::LogicalSize}, 
 
 use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, PlaneV2}, material, create_program, start_loop, Action, context::{LoopContext}, lights::PointLight};
 
-/// 法线贴图demo
+/// 视差贴图demo
 fn main() {
     let event_loop = event_loop::EventLoop::new();
     let size = LogicalSize::new(800.0, 600.0);
@@ -20,11 +20,12 @@ fn main() {
     display.gl_window().window().set_cursor_grab(CursorGrabMode::Confined).unwrap();
     display.gl_window().window().set_cursor_visible(false);
 
-    let program = create_program("src/bin/advanced_lighting_normal_mapping/formal.vert", "src/bin/advanced_lighting_normal_mapping/formal.frag", &display);
-    let light_program = create_program("src/bin/advanced_lighting_normal_mapping/light.vert", "src/bin/advanced_lighting_normal_mapping/light.frag", &display);
+    let program = create_program("src/bin/advanced_lighting_parallax_mapping/formal.vert", "src/bin/advanced_lighting_parallax_mapping/formal.frag", &display);
+    let light_program = create_program("src/bin/advanced_lighting_parallax_mapping/light.vert", "src/bin/advanced_lighting_parallax_mapping/light.frag", &display);
 
-    let texture = material::load_texture("src/brickwall/brickwall.jpg".to_string(), &display).1;
-    let normal_texture = material::load_texture("src/brickwall/brickwall_normal.jpg".to_string(), &display).1;
+    let texture = material::load_texture("src/bricks2/bricks2.jpg".to_string(), &display).1;
+    let normal_texture = material::load_texture("src/bricks2/bricks2_normal.jpg".to_string(), &display).1;
+    let disp_texture = material::load_texture("src/bricks2/bricks2_disp.jpg".to_string(), &display).1;
 
     // 点光源
     let point_light = PointLight::new_simple([0.5, 1.0, 0.3], [1.0, 1.0, 1.0]);
@@ -72,8 +73,10 @@ fn main() {
         uniforms.add_str_key("projection", &projection_matrix);
         uniforms.add_str_key("view", &view_matrix);
         uniforms.add_str_key("viewPos", &camera_position);
-        uniforms.add_str_key("wallTexture", &texture);
+        uniforms.add_str_key("diffuseMap", &texture);
         uniforms.add_str_key("normalMap", &normal_texture);
+        uniforms.add_str_key("depthMap", &disp_texture);
+        uniforms.add_str_key("height_scale", &0.1f32);
         point_light.add_to_uniforms("light", &mut uniforms);
 
         uniforms.add_str_key_value("model", UniformValue::Mat4(wall_model.into()));
