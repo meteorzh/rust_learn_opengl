@@ -3,26 +3,21 @@
 // 点光源
 struct PointLight {
     vec3 position;
-
-    float constant;
-    float linear;
-    float quadratic;
-
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
 };
 
 out vec4 FragColor;
 
 in VS_OUT {
     vec3 FragPos;
-    vec3 Normal;
     vec2 TexCoords;
+    vec3 TangentLightPos;
+    vec3 TangentViewPos;
+    vec3 TangentFragPos;
 } fs_in;
 
 uniform sampler2D wallTexture;
 uniform sampler2D normalMap;
+
 uniform PointLight light;
 uniform vec3 viewPos;
 
@@ -30,18 +25,17 @@ void main()
 {
     // obtain normal from normal map in range [0,1]
     vec3 normal = texture(normalMap, fs_in.TexCoords).rgb;
-    // transform normal vector to range [-1,1]
-    normal = normalize(normal * 2.0 - 1.0);  // this normal is in tangent space
+    normal = normalize(normal * 2.0 - 1.0);
 
     vec3 color = texture(wallTexture, fs_in.TexCoords).rgb;
     // ambient
     vec3 ambient = 0.1 * color;
     // diffuse
-    vec3 lightDir = normalize(light.position - fs_in.FragPos);
+    vec3 lightDir = normalize(fs_in.TangentLightPos - fs_in.TangentFragPos);
     float diff = max(dot(lightDir, normal), 0.0);
     vec3 diffuse = diff * color;
     // specular
-    vec3 viewDir = normalize(viewPos - fs_in.FragPos);
+    vec3 viewDir = normalize(fs_in.TangentViewPos - fs_in.TangentFragPos);
     vec3 reflectDir = reflect(-lightDir, normal);
     vec3 halfwayDir = normalize(lightDir + viewDir);
     float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);

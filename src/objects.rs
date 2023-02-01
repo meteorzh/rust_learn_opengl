@@ -1,7 +1,7 @@
-use cgmath::{Point3, Matrix4, Vector3, Transform, SquareMatrix};
+use cgmath::{Point3, Matrix4, Vector3, Transform, SquareMatrix, Point2};
 use glium::{VertexBuffer, IndexBuffer, index::PrimitiveType};
 
-use crate::Vertex;
+use crate::{Vertex, objectsv2::RawVertexPNTTB};
 
 
 static CUBE_INDEX_ARRAY: [u16; 36] = [0u16, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35];
@@ -244,6 +244,82 @@ impl Plane {
             index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 3, 4, 5]).unwrap(),
             position: Point3 { x: 0.0_f32, y: 0.0, z: 0.0 },
             model: Matrix4::identity(),
+        }
+    }
+}
+
+
+// 矩形平面
+pub struct PlaneV2 {
+    pub vertex_buffer: VertexBuffer<RawVertexPNTTB>,
+    pub index_buffer: IndexBuffer<u16>,
+}
+
+impl PlaneV2 {
+
+    pub fn new_vertical(width: f32, height: f32, display: &glium::Display) -> PlaneV2 {
+        let x = width / 2.0;
+        let y = height / 2.0;
+
+        let point1 = Point3::new(-x, y, 0.0);
+        let point2 = Point3::new(-x, -y, 0.0);
+        let point3 = Point3::new(x, -y, 0.0);
+        let point4 = Point3::new(x, y, 0.0);
+
+        let tex_coords1 = Point2::<f32>::new(0.0, 1.0);
+        let tex_coords2 = Point2::<f32>::new(0.0, 0.0);
+        let tex_coords3 = Point2::<f32>::new(1.0, 0.0);
+        let tex_coords4 = Point2::<f32>::new(1.0, 1.0);
+
+        let normal = Vector3::<f32>::new(0.0, 0.0, 1.0);
+
+        let mut edge1 = point2 - point1;
+        let mut edge2 = point3 - point1;
+        let mut delta_uv1 = tex_coords2 - tex_coords1;
+        let mut delta_uv2 = tex_coords3 - tex_coords1;
+
+        let mut f = 1.0 / (delta_uv1.x * delta_uv2.y - delta_uv2.x * delta_uv1.y);
+
+        let tangent1 = Vector3::<f32>::new(
+            f * (delta_uv2.y * edge1.x - delta_uv1.y * edge2.x),
+            f * (delta_uv2.y * edge1.y - delta_uv1.y * edge2.y),
+            f * (delta_uv2.y * edge1.z - delta_uv1.y * edge2.z),
+        );
+        let bitangent1 = Vector3::<f32>::new(
+            f * (-delta_uv2.x * edge1.x + delta_uv1.x * edge2.x),
+            f * (-delta_uv2.x * edge1.y + delta_uv1.x * edge2.y),
+            f * (-delta_uv2.x * edge1.z + delta_uv1.x * edge2.z)
+        );
+
+        edge1 = point3 - point1;
+        edge2 = point4 - point1;
+        delta_uv1 = tex_coords3 - tex_coords1;
+        delta_uv2 = tex_coords4 - tex_coords1;
+
+        f = 1.0 / (delta_uv1.x * delta_uv2.y - delta_uv2.x * delta_uv1.y);
+
+        let tangent2 = Vector3::<f32>::new(
+            f * (delta_uv2.y * edge1.x - delta_uv1.y * edge2.x),
+            f * (delta_uv2.y * edge1.y - delta_uv1.y * edge2.y),
+            f * (delta_uv2.y * edge1.z - delta_uv1.y * edge2.z),
+        );
+        let bitangent2 = Vector3::<f32>::new(
+            f * (-delta_uv2.x * edge1.x + delta_uv1.x * edge2.x),
+            f * (-delta_uv2.x * edge1.y + delta_uv1.x * edge2.y),
+            f * (-delta_uv2.x * edge1.z + delta_uv1.x * edge2.z),
+        );
+
+        PlaneV2 {
+            vertex_buffer: glium::VertexBuffer::new(display, &[
+                RawVertexPNTTB { position: point1.into(), normal: normal.into(), tex_coords: tex_coords1.into(), tangent: tangent1.into(), bitangent: bitangent1.into() },
+                RawVertexPNTTB { position: point2.into(), normal: normal.into(), tex_coords: tex_coords2.into(), tangent: tangent1.into(), bitangent: bitangent1.into() },
+                RawVertexPNTTB { position: point3.into(), normal: normal.into(), tex_coords: tex_coords3.into(), tangent: tangent1.into(), bitangent: bitangent1.into() },
+
+                RawVertexPNTTB { position: point1.into(), normal: normal.into(), tex_coords: tex_coords1.into(), tangent: tangent2.into(), bitangent: bitangent2.into() },
+                RawVertexPNTTB { position: point3.into(), normal: normal.into(), tex_coords: tex_coords3.into(), tangent: tangent2.into(), bitangent: bitangent2.into() },
+                RawVertexPNTTB { position: point4.into(), normal: normal.into(), tex_coords: tex_coords4.into(), tangent: tangent2.into(), bitangent: bitangent2.into() },
+            ]).unwrap(),
+            index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 3, 4, 5]).unwrap(),
         }
     }
 }

@@ -41,6 +41,19 @@ pub struct RawVertexP2C {
 implement_vertex!(RawVertexP2C, position, color);
 
 
+/// 顶点：位置，法向量，贴图坐标，切线向量，副切线向量
+#[derive(Copy, Clone)]
+pub struct RawVertexPNTTB {
+    pub position: [f32; 3],
+    pub normal: [f32; 3],
+    pub tex_coords: [f32; 2],
+    pub tangent: [f32; 3],
+    pub bitangent: [f32; 3],
+}
+
+implement_vertex!(RawVertexPNTTB, position, normal, tex_coords, tangent, bitangent);
+
+
 #[derive(Copy, Clone)]
 pub struct RawInstanceOffsetO2 {
     pub offset: [f32; 2],

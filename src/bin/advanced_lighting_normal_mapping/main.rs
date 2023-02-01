@@ -2,12 +2,12 @@
 extern crate glium;
 extern crate cgmath;
 
-use cgmath::{Matrix4, Vector3, InnerSpace, Deg};
+use cgmath::{Matrix4, Vector3, InnerSpace, Deg, SquareMatrix, Point3};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{glutin::{event::{Event}, window::CursorGrabMode, dpi::LogicalSize}, uniforms::{UniformValue}};
 
-use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Plane}, material, create_program, start_loop, Action, context::{LoopContext}, lights::PointLight};
+use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Plane, Cube, PlaneV2}, material, create_program, start_loop, Action, context::{LoopContext}, lights::PointLight};
 
 /// 法线贴图demo
 fn main() {
@@ -21,21 +21,23 @@ fn main() {
     display.gl_window().window().set_cursor_visible(false);
 
     let program = create_program("src/bin/advanced_lighting_normal_mapping/formal.vert", "src/bin/advanced_lighting_normal_mapping/formal.frag", &display);
+    let light_program = create_program("src/bin/advanced_lighting_normal_mapping/light.vert", "src/bin/advanced_lighting_normal_mapping/light.frag", &display);
 
     let texture = material::load_texture("src/brickwall/brickwall.jpg".to_string(), &display).1;
     let normal_texture = material::load_texture("src/brickwall/brickwall_normal.jpg".to_string(), &display).1;
 
     // 点光源
-    let point_light = PointLight::new_simple([0.5, 1.0, 0.3], [0.0, 0.0, 0.0]);
+    let point_light = PointLight::new_simple([0.5, 1.0, 0.3], [1.0, 1.0, 1.0]);
+    let light_cube = Cube::new("light", 0.1, &display, [1.0, 1.0, 1.0], Point3::new(0.5, 1.0, 0.3), Matrix4::identity());
 
     // 砖墙
-    let wall = Plane::new_vertical_center_plane("wall", 2.0, 2.0, &display, glium::index::PrimitiveType::TrianglesList);
+    let wall = PlaneV2::new_vertical(2.0, 2.0, &display);
     let mut wall_drgee: f32 = 0.0;
 
     // 摄像机初始位置(0, 0, 3), pitch = 0°, yaw = -90°;
     let camera = Camera::new(
-        cgmath::Point3::new(0_f32, 0_f32, 3_f32), 
-        cgmath::Rad::from(cgmath::Deg(-90_f32)), 
+        cgmath::Point3::new(0_f32, 0_f32, 3_f32),
+        cgmath::Rad::from(cgmath::Deg(-90_f32)),
         cgmath::Rad::from(cgmath::Deg(0_f32))
     );
     let controller = CameraController::new(1_f32, 0.5);
@@ -77,6 +79,10 @@ fn main() {
         uniforms.add_str_key_value("model", UniformValue::Mat4(wall_model.into()));
         // 渲染墙面
         target.draw(&wall.vertex_buffer, &wall.index_buffer, &program, &uniforms, &draw_parameters).unwrap();
+
+        uniforms.add_str_key_value("model", UniformValue::Mat4(light_cube.calc_model().into()));
+        // 渲染灯
+        target.draw(&light_cube.vertex_buffer, &light_cube.index_buffer, &light_program, &uniforms, &draw_parameters).unwrap();
 
         target.finish().unwrap();
 
