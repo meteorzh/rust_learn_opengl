@@ -14,7 +14,7 @@ pub struct Cube {
     id: String,
     pub vertex_buffer: VertexBuffer<Vertex>,
     pub index_buffer: IndexBuffer<u16>,
-    color: [f32; 3],
+    pub color: [f32; 3],
     position: Point3<f32>,
     pub model: Matrix4<f32>,
 }

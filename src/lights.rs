@@ -30,9 +30,9 @@ impl DirLight {
  * 点光源
  */
 pub struct PointLight {
-    position: [f32; 3],
+    pub position: [f32; 3],
 
-    color: [f32; 3],
+    pub color: [f32; 3],
 
     constant: f32,
     linear: f32,
