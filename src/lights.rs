@@ -29,6 +29,7 @@ impl DirLight {
 /**
  * 点光源
  */
+#[derive(Debug)]
 pub struct PointLight {
     pub position: [f32; 3],
 

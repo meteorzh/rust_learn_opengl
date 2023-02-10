@@ -53,6 +53,10 @@ impl<'a> DynamicUniforms<'a>{
     pub fn remove(&mut self, key: &str) {
         self.map.remove(key);
     }
+
+    pub fn clear(&mut self) {
+        self.map.clear();
+    }
 }
 
 impl Uniforms for DynamicUniforms<'_>{
