@@ -35,13 +35,15 @@ pub struct PointLight {
 
     pub color: [f32; 3],
 
-    constant: f32,
-    linear: f32,
-    quadratic: f32,
+    pub constant: f32,
+    pub linear: f32,
+    pub quadratic: f32,
 
     ambient: [f32; 3],
     diffuse: [f32; 3],
     specular: [f32; 3],
+
+    pub radius: f32,
 }
 
 impl PointLight {
@@ -55,6 +57,7 @@ impl PointLight {
             ambient: [0.0, 0.0, 0.0],
             diffuse: [0.0, 0.0, 0.0],
             specular: [0.0, 0.0, 0.0],
+            radius: 0.0
         }
     }
 
@@ -68,6 +71,7 @@ impl PointLight {
             ambient: ambient,
             diffuse: diffuse,
             specular: specular,
+            radius: 0.0
         }
     }
 
@@ -80,6 +84,7 @@ impl PointLight {
         add_to_uniforms(light_key, ".ambient", &self.ambient, uniforms);
         add_to_uniforms(light_key, ".diffuse", &self.diffuse, uniforms);
         add_to_uniforms(light_key, ".specular", &self.specular, uniforms);
+        add_to_uniforms(light_key, ".radius", &self.radius, uniforms);
     }
 }
 

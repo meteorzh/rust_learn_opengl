@@ -26,7 +26,7 @@ struct Data {
     buffs: (MultiOutputFrameBuffer<'this>, &'this Dt),
 }
 
-/// Deferred Shading demo
+/// Deferred Shading Volume demo
 fn main() {
     let event_loop = event_loop::EventLoop::new();
     let size = LogicalSize::<u32>::new(800, 600);
@@ -37,9 +37,9 @@ fn main() {
     display.gl_window().window().set_cursor_grab(CursorGrabMode::Confined).unwrap();
     display.gl_window().window().set_cursor_visible(false);
 
-    let geometry_pass_program = create_program("src/bin/advanced_lighting_deferred_shading/g_buffer.vert", "src/bin/advanced_lighting_deferred_shading/g_buffer.frag", &display);
-    let lighting_pass_program = create_program("src/bin/advanced_lighting_deferred_shading/deferred_shading.vert", "src/bin/advanced_lighting_deferred_shading/deferred_shading.frag", &display);
-    let light_cube_program = create_program("src/bin/advanced_lighting_deferred_shading/light_box.vert", "src/bin/advanced_lighting_deferred_shading/light_box.frag", &display);
+    let geometry_pass_program = create_program("src/bin/advanced_lighting_deferred_shading_volumes/g_buffer.vert", "src/bin/advanced_lighting_deferred_shading_volumes/g_buffer.frag", &display);
+    let lighting_pass_program = create_program("src/bin/advanced_lighting_deferred_shading_volumes/deferred_shading.vert", "src/bin/advanced_lighting_deferred_shading_volumes/deferred_shading.frag", &display);
+    let light_cube_program = create_program("src/bin/advanced_lighting_deferred_shading_volumes/light_box.vert", "src/bin/advanced_lighting_deferred_shading_volumes/light_box.frag", &display);
 
     let rect = Rect {
         left: 0,
@@ -74,20 +74,21 @@ fn main() {
     // 点光源
     let point_lights = {
         // 随机数生成器
-        let light_num = 32;
+        let light_num = 2;
         let mut rng = StdRng::seed_from_u64(13 as u64);
         let mut lights = Vec::with_capacity(4);
         let mut rand = |div: f32| {
             rng.gen_range(0..100) as f32 / div
         };
         for _ in 0..light_num {
-            lights.push(
-                PointLight::new(
+            let mut light = PointLight::new(
                 [rand(100.0) * 6.0 - 3.0, rand(100.0) * 6.0 - 4.0, rand(100.0) * 6.0 - 3.0], 
                 [rand(200.0) + 0.5, rand(200.0) + 0.5, rand(200.0) + 0.5],
-                0.0, 0.7, 1.8, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]
-                )
+                1.0, 0.7, 1.8, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]
             );
+            let max_brightness = light.color[0].max(light.color[1]).max(light.color[2]);
+            light.radius = (-light.linear + (light.linear * light.linear - 4.0 * light.quadratic * (light.constant - (256.0 / 5.0) * max_brightness)).sqrt()) / (2.0 * light.quadratic);
+            lights.push(light);
         }
 
         lights
