@@ -1,4 +1,6 @@
-use cgmath::{Point3, Matrix4, Vector3, Transform, SquareMatrix, Point2};
+use std::f32::consts::PI;
+
+use cgmath::{Point3, Matrix4, Vector3, Transform, SquareMatrix, Point2, Rad, Angle};
 use glium::{VertexBuffer, IndexBuffer, index::PrimitiveType};
 
 use crate::{Vertex, objectsv2::RawVertexPNTTB};
@@ -321,5 +323,85 @@ impl PlaneV2 {
             ]).unwrap(),
             index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 3, 4, 5]).unwrap(),
         }
+    }
+}
+
+
+pub struct Sphere {
+    pub vertex_buffer: VertexBuffer<Vertex>,
+    pub index_buffer: IndexBuffer<u32>,
+}
+
+impl Sphere {
+
+    /// 通过遍历生成球体顶点球体顶点原理：以原点为圆心，XY平面上的一个半圆，以Y轴为轴心旋转一圈得到一个球体
+    /// 无数个半圆组成真实的球体，但是实际渲染只能去其中一些面。
+    /// x_segments: 在一圈上面取的半圆个数，即将2PI等分为多少份
+    /// y_segments: 在半圆的弧边上，将弧边等分为多少份
+    /// radius：半径
+    /// 顶点数：(x_segments + 1) * (y_segments + 1)
+    pub fn new(radius: f32, x_segments: u32, y_segments: u32, display: &glium::Display) -> Self {
+        let (positions, uv, normals) = {
+            let mut vec = Vec::with_capacity((x_segments * y_segments) as usize);
+            let mut uv = Vec::with_capacity((x_segments * y_segments) as usize);
+            let mut normals = Vec::with_capacity((x_segments * y_segments) as usize);
+            for x in 0..=x_segments {
+                let x_segment = x as f32 / x_segments as f32;
+                for y in 0..=y_segments {
+                    let y_segment = y as f32 / y_segments as f32;
+                    let x_rad = Rad(x_segment * 2.0 * PI);
+                    let y_rad = Rad(y_segment * PI);
+
+                    let x_pos = x_rad.cos() * y_rad.sin();
+                    let y_pos = y_rad.cos();
+                    let z_pos = x_rad.sin() * y_rad.sin();
+
+                    vec.push(Point3::new(x_pos, y_pos, z_pos));
+                    uv.push(Point2::new(x_segment, y_segment));
+                    normals.push(Vector3::new(x_pos, y_pos, z_pos));
+                }
+            }
+            (vec, uv, normals)
+        };
+
+        let indices = {
+            let mut vec = Vec::with_capacity((y_segments * (x_segments + 1) * 2) as usize);
+            let mut odd_row = false;
+            for y in 0..y_segments {
+                if !odd_row {
+                    for x in 0..=x_segments {
+                        vec.push(y * (x_segments + 1) + x);
+                        vec.push((y + 1) * (x_segments + 1) + x);
+                    }
+                } else {
+                    for x in (0..=x_segments).rev() {
+                        vec.push((y + 1) * (x_segments + 1) + x);
+                        vec.push(y * (x_segments + 1) + x);
+                    }
+                }
+                odd_row = !odd_row;
+            }
+            vec
+        };
+
+        let data = {
+            let mut vec = Vec::with_capacity(positions.len());
+            for (i, position) in positions.iter().enumerate() {
+                vec.push(
+                    Vertex { position: position.to_owned().into(), normal: normals.get(i).unwrap().to_owned().into(), texture: uv.get(i).unwrap().to_owned().into() }
+                )
+            }
+            vec
+        };
+
+
+        Self {
+            vertex_buffer: glium::VertexBuffer::new(display, &data.as_slice()).unwrap(),
+            index_buffer: glium::IndexBuffer::new(display, PrimitiveType::TriangleStrip, &indices.as_slice()).unwrap(),
+        }
+    }
+
+    pub fn new_simple(display: &glium::Display) -> Self {
+        Self::new(1.0, 64, 64, display)
     }
 }
