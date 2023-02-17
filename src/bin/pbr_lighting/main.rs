@@ -2,16 +2,12 @@
 extern crate glium;
 extern crate cgmath;
 
-use std::{borrow::Cow, cmp::min};
-
-use cgmath::{Matrix4, Vector3, InnerSpace, Point3, Rad, SquareMatrix, Deg};
+use cgmath::{Matrix4, Vector3};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{glutin::{event::{Event}, window::CursorGrabMode, dpi::LogicalSize}, uniforms::{UniformValue}, framebuffer::{DepthRenderBuffer, MultiOutputFrameBuffer, SimpleFrameBuffer}, texture::{Texture2d, UncompressedFloatFormat, DepthFormat, MipmapsOption, RawImage2d, ClientFormat}, index::PrimitiveType};
+use glium::{glutin::{event::{Event}, window::CursorGrabMode, dpi::LogicalSize}, uniforms::{UniformValue}};
 
-use ouroboros::self_referencing;
-use rand::{Rng};
-use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Cube, Plane, Sphere}, create_program, start_loop, Action, context::{LoopContext}, lights::PointLight, load_wavefront_obj_as_models};
+use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Sphere}, create_program, start_loop, Action, context::{LoopContext}, lights::PointLight};
 
 /// PBR lighting demo
 fn main() {
@@ -103,6 +99,8 @@ fn main() {
             uniforms.add_str_key_value("model", UniformValue::Mat4(model.into()));
             target.draw(&sphere.vertex_buffer, &sphere.index_buffer, &pbr_program, &uniforms, &draw_parameters).unwrap();
         }
+        // 有个奇怪的点：渲染球体时没有向uniforms添加光源信息，添加光源后仅渲染光源，之前球体的片段也会有光源的效果
+        // 猜想：其实总体仅渲染了一次，调用draw时，仅做了一些变量绑定的工作，finish的时候做swap_buffer操作时才会调用着色器
 
         target.finish().unwrap();
 
