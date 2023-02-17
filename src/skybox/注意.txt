@@ -1,0 +1,3 @@
+skybox文件夹中的素材
+
+文件命名时是以天空盒外的视角进行命名的，所以front.jpg在天空盒内部视角时应该是back，及POSITIVE_Z，同理back.jpg应为NEGTIVE_Z
