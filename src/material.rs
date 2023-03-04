@@ -2,6 +2,7 @@ use std::{rc::Rc, collections::HashMap, sync::Arc, io::Cursor, fs};
 
 use futures::{executor::{block_on, ThreadPool, ThreadPoolBuilder}};
 use glium::{texture::{CompressedSrgbTexture2d, DepthCubemap, DepthTexture2d, SrgbCubemap, CubeLayer, RawImage2d}, Display, framebuffer::{SimpleFrameBuffer}, Texture2d, Surface, BlitTarget, uniforms::MagnifySamplerFilter};
+use image::DynamicImage;
 use obj::Mtl;
 
 use crate::{uniforms::{DynamicUniforms, add_to_uniforms}, utils};
@@ -210,19 +211,25 @@ pub fn load_texture(path: String, display: &Display) -> (String, CompressedSrgbT
 }
 
 pub fn load_image(path: &str) -> RawImage2d<u8> {
+    let image = load_as_dynamic(path).to_rgba8();
+    let image_dimensions = image.dimensions();
+    RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions)
+}
+
+pub fn load_as_dynamic(path: &str) -> DynamicImage {
     println!("加载材质图片: {}", path);
     let format = {
         if path.ends_with(".png") {
             image::ImageFormat::Png
         } else if path.ends_with(".jpg") {
             image::ImageFormat::Jpeg
+        } else if path.ends_with(".hdr") {
+            image::ImageFormat::Hdr
         } else {
             panic!("不支持的图片格式");
         }
     };
-    let image = image::load(Cursor::new(fs::read(path).unwrap()), format).unwrap().to_rgba8();
-    let image_dimensions = image.dimensions();
-    RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions)
+    image::load(Cursor::new(fs::read(path).unwrap()), format).unwrap()
 }
 
 static CUBEMAP_FILES: [(&str, CubeLayer); 6] = [
