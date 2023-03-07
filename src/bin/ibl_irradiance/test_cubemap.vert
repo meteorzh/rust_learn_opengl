@@ -10,5 +10,8 @@ out vec3 FragPos;
 void main()
 {
     FragPos = position;
-    gl_Position = (projection * view * vec4(position, 1.0)).xyww;
+    mat4 rotView = mat4(mat3(view));
+    vec4 clipPos = projection * rotView * vec4(position, 1.0);
+
+    gl_Position = clipPos.xyww;
 }

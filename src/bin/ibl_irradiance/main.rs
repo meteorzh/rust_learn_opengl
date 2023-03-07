@@ -2,10 +2,13 @@
 extern crate glium;
 extern crate cgmath;
 
+use std::{fs::File, io::BufReader};
+
 use cgmath::{Matrix4, Vector3, Point3, SquareMatrix, Deg};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{glutin::{event::{Event}, window::CursorGrabMode, dpi::LogicalSize}, uniforms::{UniformValue}, framebuffer::{DepthRenderBuffer, SimpleFrameBuffer}, texture::{DepthFormat, Texture2d, UncompressedFloatFormat, MipmapsOption, Cubemap, RawImage2d}, DepthTest, Rect, index::PrimitiveType};
+use image::io::Reader as ImageReader;
 
 use ouroboros::self_referencing;
 use rust_opengl_learn::{camera::{Camera, CameraController}, uniforms::DynamicUniforms, objects::{Sphere, Cube, Plane}, create_program, start_loop, Action, context::{LoopContext}, lights::PointLight, material, create_program_vgf};
@@ -57,9 +60,9 @@ fn main() {
     let mut tenants = DataBuilder {
         dt: Dt {
             hdr_env_texture: {
-                // pbr: load the HDR environment map
-                let hdr_env_image = material::load_as_dynamic("src/hdr/newport_loft.hdr");
-                let hdr_env_image = hdr_env_image.into_rgb8();
+                let hdr_env_image = ImageReader::open("src/hdr/newport_loft.hdr").unwrap().decode().unwrap();
+                // let hdr_env_image = material::load_as_dynamic("src/hdr/newport_loft.hdr");
+                let hdr_env_image = hdr_env_image.into_rgb32f();
                 let dimensions = hdr_env_image.dimensions();
                 let hdr_env_image = RawImage2d::from_raw_rgb_reversed(&hdr_env_image.into_raw(), dimensions);
                 Texture2d::with_format(&display, hdr_env_image, UncompressedFloatFormat::F16F16F16, MipmapsOption::NoMipmap).unwrap()
@@ -161,7 +164,7 @@ fn main() {
 
     let draw_parameters = glium::DrawParameters {
         depth: glium::Depth {
-            test: DepthTest::IfLess,
+            test: DepthTest::IfLessOrEqual,
             write: true,
             .. Default::default()
         },
@@ -191,18 +194,20 @@ fn main() {
 
             // 测试：显示等距柱状投影图
             // let mut test_uniforms = DynamicUniforms::new();
-            // test_uniforms.add_str_key("image", &dt.test_texture);
-            // target.draw(&dt.plane.vertex_buffer, &dt.plane.index_buffer, &test_hdr_image_program, &uniforms, &draw_parameters).unwrap();
+            // test_uniforms.add_str_key("image", &dt.hdr_env_texture);
+            // test_uniforms.add_str_key_value("exposure", UniformValue::Float(1.0));
+            // target.draw(&dt.plane.vertex_buffer, &dt.plane.index_buffer, &test_hdr_image_program, &test_uniforms, &draw_parameters).unwrap();
             // 测试：显示环境贴图
-            let mut test_uniforms = DynamicUniforms::new();
-            test_uniforms.add_str_key("projection", &projection_matrix);
-            test_uniforms.add_str_key("view", &view_matrix);
-            test_uniforms.add_str_key("camPos", &camera_position);
-            test_uniforms.add_str_key("image", &dt.env_cubemap);
-            target.draw(&dt.skybox.vertex_buffer, &dt.skybox.index_buffer, &test_cubemap_program, &uniforms, &draw_parameters).unwrap();
+            // let mut test_uniforms = DynamicUniforms::new();
+            // test_uniforms.add_str_key("projection", &projection_matrix);
+            // test_uniforms.add_str_key("view", &view_matrix);
+            // test_uniforms.add_str_key("camPos", &camera_position);
+            // test_uniforms.add_str_key("image", &dt.env_cubemap);
+            // test_uniforms.add_str_key_value("exposure", UniformValue::Float(1.0));
+            // target.draw(&dt.cube.vertex_buffer, &dt.cube.index_buffer, &test_cubemap_program, &test_uniforms, &draw_parameters).unwrap();
             
-            target.finish().unwrap();
-            return Action::Continue;
+            // target.finish().unwrap();
+            // return Action::Continue;
 
             // 渲染球体
             for r in 0..sphere_rows {
