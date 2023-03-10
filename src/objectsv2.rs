@@ -1,5 +1,5 @@
 use cgmath::{Point3, Point2, Vector3};
-use glium::implement_vertex;
+use glium::{implement_vertex, VertexBuffer, IndexBuffer, Display, Frame};
 
 
 #[derive(Copy, Clone)]
@@ -8,6 +8,14 @@ pub struct RawVertexP2 {
 }
 
 implement_vertex!(RawVertexP2, position);
+
+#[derive(Copy, Clone)]
+pub struct RawVertexP2T {
+    pub position: [f32; 2],
+    pub texture: [f32; 2],
+}
+
+implement_vertex!(RawVertexP2T, position, texture);
 
 #[derive(Copy, Clone)]
 pub struct RawVertexP {
@@ -70,11 +78,30 @@ implement_vertex!(RawInstanceDataM4, model);
 
 // 可绘制特征，需要实现获取vertexBuffer, indexBuffer等
 pub trait Drawable {
-    
+    fn draw(frame: &mut Frame);
 }
 
 pub struct VertexV2 {
     pub position: Point3<f32>,
     pub texture: Option<Point2<f32>>,
     pub color: Option<Vector3<f32>>,
+}
+
+
+/// idea: CharacterRepo restore textureCharacter
+/// Text struct represent a renderable text, and can change char at specify position.
+pub struct Text {
+    // pub vertex_buffer: VertexBuffer<RawVertexP2T>,
+    // pub index_buffer: IndexBuffer<u32>,
+}
+
+impl Text {
+
+    pub fn new(display: &Display, text: &str, x: f32, ) -> Self {
+        
+        Text {
+            // vertex_buffer: VertexBuffer::empty_dynamic(display, vertex_number).unwrap(),
+            // index_buffer: ()
+        }
+    }
 }

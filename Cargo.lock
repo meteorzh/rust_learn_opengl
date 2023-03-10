@@ -1562,6 +1562,7 @@ version = "0.1.0"
 dependencies = [
  "cgmath 0.18.0",
  "chrono",
+ "freetype-rs",
  "futures",
  "glium",
  "image",
