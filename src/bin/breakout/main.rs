@@ -275,10 +275,37 @@ impl <'a> Game<'a> {
         // 检测当前关卡中所有砖块的碰撞
         let level = self.levels.get_mut(self.level as usize).unwrap();
         for brick in level.bricks.iter_mut() {
-            if !brick.destroyed && check_collisions_aabb_round(&self.ball, brick) {
-                if !brick.is_solid {
-                    // 摧毁砖块
-                    brick.destroyed = true;
+            if !brick.destroyed {
+                // 碰撞检测
+                if let Some((direction, vec)) = check_collisions_aabb_round(&self.ball, brick) {
+                    if !brick.is_solid {
+                        // 摧毁砖块
+                        brick.destroyed = true;
+                    }
+                    // 处理碰撞
+                    let ball_velocity = &mut self.ball.game_object.velocity;
+                    let ball_position = &mut self.ball.game_object.position;
+                    match direction {
+                        Direction::Left | Direction::Right => {
+                            ball_velocity.x = -ball_velocity.x;
+                            // 重定位
+                            let penetration = self.ball.radius - num_traits::abs(vec.x);
+                            if direction == Direction::Left {
+                                ball_position.x += penetration;
+                            } else {
+                                ball_position.x -= penetration;
+                            }
+                        },
+                        Direction::Up | Direction::Down => {
+                            ball_velocity.y = -ball_velocity.y;
+                            let penetration = self.ball.radius - num_traits::abs(vec.y);
+                            if direction == Direction::Up {
+                                ball_position.y -= penetration;
+                            } else {
+                                ball_position.y += penetration;
+                            }
+                        },
+                    }
                 }
             }
         }
@@ -310,6 +337,41 @@ impl <'a> Game<'a> {
 }
 
 
+enum Direction {
+    Up,
+
+    Right,
+
+    Down,
+
+    Left,
+}
+
+static COMPASS: [(Direction, Vector2<f32>); 4] = [
+    (Direction::Up, Vector2::new(0.0, 1.0)),
+    (Direction::Right, Vector2::new(1.0, 0.0)),
+    (Direction::Down, Vector2::new(0.0, -1.0)),
+    (Direction::Left, Vector2::new(-1.0, 0.0)),
+];
+
+/// 判断碰撞方向，vector向量为球碰撞的方向向量，其中四个对比方向也是按照球的角度来思考的
+fn vector_direction(vector: Vector2<f32>) -> Direction {
+    let mut max = 0.0_f32;
+    let best_match = Direction::Up;
+
+    let normalize = vector.normalize();
+    for direction in COMPASS {
+        let dot = normalize.dot(direction.1);
+        if dot > max {
+            max = dot;
+            best_match = direction.0;
+        }
+    }
+
+    best_match
+}
+
+
 fn check_collisions_aabb_aabb(one: &GameObject, two: &GameObject) -> bool {
     // 判断x轴方向碰撞
     let collisions_x = (one.position.x + one.size.x) >= two.position.x && one.position.x <= (two.position.x + two.size.x);
@@ -318,7 +380,7 @@ fn check_collisions_aabb_aabb(one: &GameObject, two: &GameObject) -> bool {
     collisions_x && collisions_y
 }
 
-fn check_collisions_aabb_round(one: &BallObject, two: &GameObject) -> bool {
+fn check_collisions_aabb_round(one: &BallObject, two: &GameObject) -> Option<(Direction, Vector2<f32>)> {
     // 圆心
     let center = Point2::new(one.game_object.position.x + one.radius, one.game_object.position.y + one.radius);
     // aabb的信息
@@ -335,7 +397,12 @@ fn check_collisions_aabb_round(one: &BallObject, two: &GameObject) -> bool {
     let closest = aabb_center + clamped;
     // 根据最近点到圆心的向量的模和半径对比获得碰撞结果
     let result = closest - center.to_vec();
-    result.magnitude() <= one.radius
+    
+    if result.magnitude() <= one.radius {
+        Some((vector_direction(result), result))
+    } else {
+        None
+    }
 }
 
 
