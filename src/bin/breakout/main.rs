@@ -2,14 +2,14 @@
 extern crate glium;
 extern crate cgmath;
 
-use std::{collections::HashMap, fs, time::Duration};
+use std::{collections::HashMap, fs, time::Duration, cmp};
 
-use cgmath::{Point2, Vector2, Vector3, Matrix4, Deg};
+use cgmath::{Point2, Vector2, Vector3, Matrix4, Deg, EuclideanSpace, InnerSpace};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{glutin::{event::{Event, VirtualKeyCode, KeyboardInput, ElementState}, window::CursorGrabMode, dpi::LogicalSize}, Program, texture::{Texture2d}, VertexBuffer, Display, IndexBuffer, index::PrimitiveType, uniforms::UniformValue, DrawParameters, Blend, BackfaceCullingMode};
 
-use rust_opengl_learn::{uniforms::DynamicUniforms, create_program, Action, context::{LoopContext2D, KeyboardRegistry}, objectsv2::RawVertexP2T, material, event::keyboard::KeyboardInteract, start_loop_2d};
+use rust_opengl_learn::{uniforms::DynamicUniforms, create_program, Action, context::{LoopContext2D, KeyboardRegistry}, objectsv2::RawVertexP2T, material, event::keyboard::KeyboardInteract, start_loop_2d, utils::clamp_vec2};
 
 /// BreakOut 2D Game
 fn main() {
@@ -198,7 +198,7 @@ impl <'a> Game<'a> {
                 destroyed: false,
                 texture_key: "paddle".to_string(),
             },
-            ball: BallObject::new(ball_position, Vector2::new(100.0, -350.0), "face".to_string(), ball_radius),
+            ball: BallObject::new(ball_position, Vector2::new(50.0, -175.0), "face".to_string(), ball_radius),
         }
     }
 
@@ -264,7 +264,24 @@ impl <'a> Game<'a> {
     }
 
     fn update(&mut self, dt: Duration) {
+        // 绘制球
         self.ball.move_ball(self.width, dt);
+
+        // 检测碰撞
+        self.do_collisions();
+    }
+
+    fn do_collisions(&mut self) {
+        // 检测当前关卡中所有砖块的碰撞
+        let level = self.levels.get_mut(self.level as usize).unwrap();
+        for brick in level.bricks.iter_mut() {
+            if !brick.destroyed && check_collisions_aabb_round(&self.ball, brick) {
+                if !brick.is_solid {
+                    // 摧毁砖块
+                    brick.destroyed = true;
+                }
+            }
+        }
     }
 
     fn render<T: Surface>(&self, surface: &mut T) {
@@ -290,6 +307,35 @@ impl <'a> Game<'a> {
             }
         }
     }
+}
+
+
+fn check_collisions_aabb_aabb(one: &GameObject, two: &GameObject) -> bool {
+    // 判断x轴方向碰撞
+    let collisions_x = (one.position.x + one.size.x) >= two.position.x && one.position.x <= (two.position.x + two.size.x);
+    let collisions_y = (one.position.y + one.size.y) >= two.position.y && one.position.y <= (two.position.y + two.size.y);
+    
+    collisions_x && collisions_y
+}
+
+fn check_collisions_aabb_round(one: &BallObject, two: &GameObject) -> bool {
+    // 圆心
+    let center = Point2::new(one.game_object.position.x + one.radius, one.game_object.position.y + one.radius);
+    // aabb的信息
+    let half_extends = Vector2::new(two.size.x / 2.0, two.size.y / 2.0);
+    let aabb_center = Vector2::new(
+        two.position.x + half_extends.x,
+        two.position.y + half_extends.y
+    );
+
+    let difference = center - aabb_center;
+    // difference.clamp
+    let clamped = clamp_vec2(difference.to_vec(), -half_extends, half_extends);
+    // aabb的中心加clamp的向量为最近点的位置
+    let closest = aabb_center + clamped;
+    // 根据最近点到圆心的向量的模和半径对比获得碰撞结果
+    let result = closest - center.to_vec();
+    result.magnitude() <= one.radius
 }
 
 

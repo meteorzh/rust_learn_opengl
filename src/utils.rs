@@ -1,3 +1,4 @@
+use cgmath::Vector2;
 use glium::{Display, vertex::VertexBufferAny};
 
 use crate::Vertex;
@@ -62,4 +63,12 @@ pub fn concat_filepath(path1: &str, path2: &str) -> String {
     }
     path.push_str(path2);
     path
+}
+
+
+pub fn clamp_vec2(value: Vector2<f32>, min: Vector2<f32>, max: Vector2<f32>) -> Vector2<f32> {
+    Vector2::new(
+        num_traits::clamp(value.x, min.x, max.x),
+        num_traits::clamp(value.y, min.y, max.y)
+    )
 }
