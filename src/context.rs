@@ -1,6 +1,6 @@
 use std::{time::Duration, collections::HashMap, sync::Mutex};
 
-use glium::glutin::event::{Event, WindowEvent};
+use glium::glutin::event::{Event, WindowEvent, VirtualKeyCode, KeyboardInput};
 use once_cell::sync::{Lazy};
 
 use crate::{event::{keyboard::{KeyboardHandler, KeyboardInteract}}, camera::{Camera, CameraController}};
@@ -41,7 +41,9 @@ pub static CONTEXT_STORE: Lazy<Mutex<LoopStore>> = Lazy::new(|| {
 });
 
 
+
 /// 渲染循环上下文对象
+/// 支持摄像机功能
 pub struct LoopContext {
 
     pub camera: Camera,
@@ -93,3 +95,106 @@ impl LoopContext {
 //     /// 暂时传一个帧间隔时间，以后有需求再做参数设计
 //     fn prepare(&self, camera: &mut Camera, frame_duration: Duration);
 // }
+
+/// 键盘功能注册
+pub trait KeyboardRegistry<T: KeyboardInteract> {
+
+    fn register(&mut self, key: String, keyboard_interact: T);
+
+    fn get(&self, key: String) -> &T;
+
+    fn handle_keyboard(&mut self, input: KeyboardInput);
+}
+
+/// 键盘功能注册器
+struct KeyboardRegister<T: KeyboardInteract> {
+
+    interactors: HashMap<String, T>,
+
+    interact_map: HashMap<VirtualKeyCode, String>,
+}
+
+/// 实现键盘注册器自身方法
+impl <T: KeyboardInteract> KeyboardRegister<T> {
+    
+    pub fn new() -> KeyboardRegister<T> {
+        KeyboardRegister {
+            interactors: HashMap::new(),
+            interact_map: HashMap::new(),
+        }
+    }
+}
+
+/// 实现键盘注册功能
+impl <T: KeyboardInteract> KeyboardRegistry<T> for KeyboardRegister<T> {
+
+    fn register(&mut self, key: String, keyboard_interact: T) {
+        keyboard_interact.init();
+        for keycode in keyboard_interact.interact_keycodes().iter() {
+            self.interact_map.insert(*keycode, key.clone());
+        }
+        self.interactors.insert(key, keyboard_interact);
+    }
+
+    fn get(&self, key: String) -> &T {
+        self.interactors.get(key.as_str()).unwrap()
+    }
+
+    fn handle_keyboard(&mut self, input: KeyboardInput) {
+        if let Some(code) = input.virtual_keycode {
+            if let Some(key) = self.interact_map.get(&code) {
+                if let Some(interact) = self.interactors.get_mut(key) {
+                    (*interact).interact(input);
+                } else {
+                    println!("error: no interact found for keycode {:#?}", code);
+                }
+            }
+        } else {
+            println!("no virtual keycode found!");
+        }
+    }
+}
+
+
+/// 2D渲染循环上下文
+pub struct LoopContext2D<T: KeyboardInteract> {
+
+    keyboard_register: KeyboardRegister<T>,
+}
+
+impl <T: KeyboardInteract> LoopContext2D<T> {
+
+    pub fn new() -> LoopContext2D<T> {
+        LoopContext2D {
+            keyboard_register: KeyboardRegister::new(),
+        }
+    }
+
+    pub fn handle_event(&mut self, event: &Event<()>) {
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                // key input
+                WindowEvent::KeyboardInput { input, .. } => {
+                    self.keyboard_register.handle_keyboard(*input);
+                },
+                _ => {},
+            },
+            _ => {},
+        }
+    }
+}
+
+impl <T: KeyboardInteract> KeyboardRegistry<T> for LoopContext2D<T> {
+
+    fn register(&mut self, key: String, keyboard_interact: T) {
+        self.keyboard_register.register(key, keyboard_interact);
+    }
+
+    fn get(&self, key: String) -> &T {
+        self.keyboard_register.get(key)
+    }
+
+    fn handle_keyboard(&mut self, input: KeyboardInput) {
+        self.keyboard_register.handle_keyboard(input);
+    }
+}

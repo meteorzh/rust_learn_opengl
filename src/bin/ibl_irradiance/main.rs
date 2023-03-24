@@ -173,7 +173,7 @@ fn main() {
 
     let loop_context = LoopContext::new(camera, controller);
 
-    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx, _| {
         tenants.with_mut(|fields| {
             let dt = fields.dt;
             // 摄像机观察矩阵

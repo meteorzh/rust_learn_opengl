@@ -1,7 +1,7 @@
 use std::{rc::Rc, collections::HashMap, sync::Arc, io::Cursor, fs};
 
 use futures::{executor::{block_on, ThreadPool, ThreadPoolBuilder}};
-use glium::{texture::{CompressedSrgbTexture2d, DepthCubemap, DepthTexture2d, SrgbCubemap, CubeLayer, RawImage2d}, Display, framebuffer::{SimpleFrameBuffer}, Texture2d, Surface, BlitTarget, uniforms::MagnifySamplerFilter};
+use glium::{texture::{CompressedSrgbTexture2d, DepthCubemap, DepthTexture2d, SrgbCubemap, CubeLayer, RawImage2d, SrgbTexture2d}, Display, framebuffer::{SimpleFrameBuffer}, Texture2d, Surface, BlitTarget, uniforms::MagnifySamplerFilter};
 use image::DynamicImage;
 use obj::Mtl;
 
@@ -208,6 +208,18 @@ pub fn load_texture(path: String, display: &Display) -> (String, CompressedSrgbT
     let temp = path.clone();
     let image = load_image(&temp);
     (path, glium::texture::CompressedSrgbTexture2d::new(display, image).unwrap())
+}
+
+pub fn load_texture2(path: String, display: &Display) -> (String, Texture2d) {
+    let temp = path.clone();
+    let image = load_image(&temp);
+    (path, Texture2d::new(display, image).unwrap())
+}
+
+pub fn load_texture3(path: String, display: &Display) -> (String, SrgbTexture2d) {
+    let temp = path.clone();
+    let image = load_image(&temp);
+    (path, SrgbTexture2d::new(display, image).unwrap())
 }
 
 pub fn load_image(path: &str) -> RawImage2d<u8> {

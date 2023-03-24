@@ -10,7 +10,7 @@ pub trait KeyboardInteract {
 
     fn interact_keycodes(&self) -> Vec<VirtualKeyCode>;
 
-    fn interact(&self, input: KeyboardInput);
+    fn interact(&mut self, input: KeyboardInput);
 }
 
 pub struct KeyboardHandler {
@@ -38,10 +38,10 @@ impl KeyboardHandler {
         self.interacts.push(interact);
     }
 
-    pub fn process_keyboard(&self, input: KeyboardInput) {
+    pub fn process_keyboard(&mut self, input: KeyboardInput) {
         if let Some(code) = input.virtual_keycode {
             if let Some(index) = self.interact_map.get(&code) {
-                if let Some(interact) = self.interacts.get(*index) {
+                if let Some(interact) = self.interacts.get_mut(*index) {
                     (*interact).interact(input);
                 } else {
                     println!("error: no interact found for keycode {:#?}", code);

@@ -1,8 +1,9 @@
 use std::{collections::{HashMap}, rc::Rc, fs::{self}, time::{Instant, Duration}};
 
 use cgmath::{Vector3, Zero, Vector2};
-use context::{LoopContext};
+use context::{LoopContext, LoopContext2D};
 
+use event::keyboard::KeyboardInteract;
 use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, program::{SourceCode, ProgramCreationInput}, Program, glutin::{event_loop::{EventLoop, ControlFlow}, event::{Event, WindowEvent, StartCause, KeyboardInput, VirtualKeyCode, ElementState}}};
 use material::{Material, MaterialLoader};
 use obj::{ObjMaterial};
@@ -126,7 +127,7 @@ pub enum Action {
 
 /// 开始渲染循环
 pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext, mut render_func: F) 
-    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext) -> Action {
+    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext, Duration) -> Action {
 
     let mut last_frame = Instant::now();
 
@@ -171,7 +172,65 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext, mut render
 
         ctx.prepare_render(frame_duration);
 
-        match render_func(raw_event, &mut ctx) {
+        match render_func(raw_event, &mut ctx, frame_duration) {
+            Action::Continue => {
+                // 下一帧时间
+                let next_frame_time = current + Duration::from_nanos(16_666_667);
+                *control_flow = ControlFlow::WaitUntil(next_frame_time);
+                // 更新上一帧时间变量
+                last_frame = current;
+            },
+            Action::Stop => *control_flow = ControlFlow::Exit
+        }
+    });
+}
+
+/// 开始渲染循环2D
+pub fn start_loop_2d<F, T>(event_loop: EventLoop<()>, mut ctx: LoopContext2D<T>, mut render_func: F) 
+    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext2D<T>, Duration) -> Action, T: 'static + KeyboardInteract {
+
+    let mut last_frame = Instant::now();
+
+    event_loop.run(move |event, _, control_flow| {
+        let mut render = false;
+        let mut raw_event: Option<Event<()>> = None;
+
+        if let Some(event) = event.to_static() {
+            match &event {
+                Event::WindowEvent { event, .. } => match event {
+                    // Break from the main loop when the window is closed.
+                    WindowEvent::CloseRequested => {
+                        *control_flow = ControlFlow::Exit;
+                    },
+                    // key input
+                    WindowEvent::KeyboardInput { input, .. } => {
+                        if let Some(cf) = handle_keyboard_input(*input) {
+                            *control_flow = cf;
+                        }
+                    },
+                    _ => {},
+                },
+                Event::NewEvents(cause) => match cause {
+                    StartCause::ResumeTimeReached { .. } | StartCause::Init => {
+                        // 帧时间限制达到后可以渲染
+                        render = true;
+                    },
+                    _ => {},
+                },
+                _ => {},
+            }
+            ctx.handle_event(&event);
+
+            if !render {
+                return;
+            }
+
+            raw_event = Some(event);
+        }
+        let current = Instant::now();
+        let frame_duration = current.duration_since(last_frame);
+
+        match render_func(raw_event, &mut ctx, frame_duration) {
             Action::Continue => {
                 // 下一帧时间
                 let next_frame_time = current + Duration::from_nanos(16_666_667);

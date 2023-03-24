@@ -95,7 +95,7 @@ fn main() {
     let mut loop_context = LoopContext::new(camera, controller);
     loop_context.register_keyboard(Box::new(KeyboardInteractor{}));
 
-    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx, _| {
         // 创建深度贴图的帧缓冲
         let mut depth_framebuffer = SimpleFrameBuffer::depth_only(&display, &shadow_cubemap).unwrap();
         depth_framebuffer.clear_color_and_depth((1.0, 1.0, 1.0, 1.0), 1.0);
@@ -167,7 +167,7 @@ impl KeyboardInteract for KeyboardInteractor {
         vec![VirtualKeyCode::F]
     }
 
-    fn interact(&self, input: KeyboardInput) {
+    fn interact(&mut self, input: KeyboardInput) {
         if input.state == ElementState::Released {
             let mut store = CONTEXT_STORE.lock().unwrap();
             let blinn = store.get_value("shadows");

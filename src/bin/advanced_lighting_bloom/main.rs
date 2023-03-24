@@ -121,7 +121,7 @@ fn main() {
     let mut loop_context = LoopContext::new(camera, controller);
     loop_context.register_keyboard(Box::new(KeyboardInteractor{}));
 
-    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx, _| {
         tenants.with_mut(|fields| {
             let dt = fields.dt;
             // 摄像机观察矩阵
@@ -227,7 +227,7 @@ impl KeyboardInteract for KeyboardInteractor {
         vec![VirtualKeyCode::Q, VirtualKeyCode::E, VirtualKeyCode::F]
     }
 
-    fn interact(&self, input: KeyboardInput) {
+    fn interact(&mut self, input: KeyboardInput) {
         let mut store = CONTEXT_STORE.lock().unwrap();
         if input.state == ElementState::Pressed {
             if let Some(k) = input.virtual_keycode {

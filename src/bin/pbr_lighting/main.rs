@@ -56,7 +56,7 @@ fn main() {
 
     let loop_context = LoopContext::new(camera, controller);
 
-    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx, _| {
         // 摄像机观察矩阵
         let view_matrix: [[f32; 4]; 4] = ctx.camera.calc_matrix().into();
         let camera_position: [f32; 3] = ctx.camera.position.into();

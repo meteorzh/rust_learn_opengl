@@ -63,7 +63,7 @@ fn main() {
 
     let loop_context = LoopContext::new(camera, controller);
 
-    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx, _| {
         let floor_model = UniformValue::Mat4(floor.calc_model().into());
 
         // 首先在光源的视角渲染一个帧缓冲，用于创建深度贴图

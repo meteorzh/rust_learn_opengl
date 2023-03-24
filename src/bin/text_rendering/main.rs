@@ -76,7 +76,7 @@ fn main() {
 
     let loop_context = LoopContext::new(camera, controller);
 
-    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx| {
+    start_loop(event_loop, loop_context, move |_: Option<Event<()>>, ctx, _| {
         // 创建默认帧
         let mut target = display.draw();
         target.clear_color_and_depth((0.1, 0.1, 0.1, 1.0), 1.0);
