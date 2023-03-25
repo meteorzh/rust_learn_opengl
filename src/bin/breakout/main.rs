@@ -158,7 +158,7 @@ impl <'a> ResourceManager<'a> {
     }
 }
 
-
+static INITIAL_BALL_VELOCITY: Vector2<f32> = Vector2::new(100.0, -350.0);
 /// 游戏类
 struct Game<'a> {
     state: GameState,
@@ -198,7 +198,7 @@ impl <'a> Game<'a> {
                 destroyed: false,
                 texture_key: "paddle".to_string(),
             },
-            ball: BallObject::new(ball_position, Vector2::new(50.0, -175.0), "face".to_string(), ball_radius),
+            ball: BallObject::new(ball_position, INITIAL_BALL_VELOCITY, "face".to_string(), ball_radius),
         }
     }
 
@@ -269,6 +269,27 @@ impl <'a> Game<'a> {
 
         // 检测碰撞
         self.do_collisions();
+
+        // 检测球是否超出底部边界
+        if self.ball.game_object.position.y >= self.height {
+            // 重置关卡和玩家挡板
+            self.reset_level();
+            self.reset_player();
+        }
+    }
+
+    fn reset_level(&mut self) {
+        let current_level = self.levels.get_mut(self.level as usize).unwrap();
+        current_level.reset();
+    }
+
+    fn reset_player(&mut self) {
+        // 重置球和玩家的位置
+        let player_position = Point2::new(width as f32 / 2.0 - player_size.x / 2.0, height as f32 - player_size.y);
+        self.player.position = player_position;
+        // 计算球的初始位置，球的位置应该在挡板上边
+        let ball_position = player_position + Vector2::new(player_size.x / 2.0 - ball_radius, -ball_radius * 2.0);
+        self.ball.stuck = true;
     }
 
     fn do_collisions(&mut self) {
@@ -307,6 +328,22 @@ impl <'a> Game<'a> {
                         },
                     }
                 }
+            }
+        }
+
+        // 判断球和玩家挡板的碰撞
+        if !self.ball.stuck {
+            if let Some(direction, vec) = check_collisions_aabb_round(&self.ball, &self.player) {
+                let player_center = self.player.position.x + self.player.size.x / 2.0;
+                // 检查碰到挡板哪个位置，并根据位置来改变速度
+                let distance = self.ball.game_object.position.x + self.ball.radius - player_center;
+                let percentage = distance / (self.player.size.x / 2.0);
+                // 根据结果移动
+                let strength = 2.0_f32;
+                let old_velocity = self.ball.game_object.velocity;
+                // let tmp_velocity = Vector2::new(INITIAL_BALL_VELOCITY.x * percentage * strength, -old_velocity.y);
+                let tmp_velocity = Vector2::new(INITIAL_BALL_VELOCITY.x * percentage * strength, -num_traits::abs(old_velocity.y)); // 处理粘板问题
+                self.ball.game_object.velocity = tmp_velocity.normalize() * old_velocity.magnitude();
             }
         }
     }
@@ -498,6 +535,15 @@ impl GameLevel {
         level
     }
 
+    fn reset(&mut self) {
+        // 重置关卡
+        self.destroyed_count = 0;
+        self.destroyable_count = self.bricks.len();
+        for brick in self.bricks.iter_mut() {
+            brick.destroyed = false;
+        }
+    }
+
     // 渲染关卡
     fn draw<T: Surface>(&self, renderer: &SpriteRenderer, surface: &mut T, resource_manager: &ResourceManager) {
         // 渲染所有未被破坏的砖块
@@ -642,7 +688,9 @@ impl BallObject {
     }
 
     fn reset(&mut self, position: Point2<f32>, velocity: Vector2<f32>) {
-
+        self.game_object.position = position;
+        self.game_object.velocity = velocity;
+        
     }
 
     fn draw<T: Surface>(&self, renderer: &SpriteRenderer, surface: &mut T, resource_manager: &ResourceManager) {
