@@ -2,7 +2,7 @@
 extern crate glium;
 extern crate cgmath;
 
-use std::{collections::HashMap, fs, time::Duration, cmp};
+use std::{collections::HashMap, fs, time::Duration};
 
 use cgmath::{Point2, Vector2, Vector3, Matrix4, Deg, EuclideanSpace, InnerSpace};
 #[allow(unused_imports)]
@@ -271,7 +271,7 @@ impl <'a> Game<'a> {
         self.do_collisions();
 
         // 检测球是否超出底部边界
-        if self.ball.game_object.position.y >= self.height {
+        if self.ball.game_object.position.y >= self.height as f32 {
             // 重置关卡和玩家挡板
             self.reset_level();
             self.reset_player();
@@ -285,10 +285,10 @@ impl <'a> Game<'a> {
 
     fn reset_player(&mut self) {
         // 重置球和玩家的位置
-        let player_position = Point2::new(width as f32 / 2.0 - player_size.x / 2.0, height as f32 - player_size.y);
+        let player_position = Point2::new(self.width as f32 / 2.0 - self.player.size.x / 2.0, self.height as f32 - self.player.size.y);
         self.player.position = player_position;
         // 计算球的初始位置，球的位置应该在挡板上边
-        let ball_position = player_position + Vector2::new(player_size.x / 2.0 - ball_radius, -ball_radius * 2.0);
+        let ball_position = player_position + Vector2::new(self.player.size.x / 2.0 - self.ball.radius, -self.ball.radius * 2.0);
         self.ball.stuck = true;
     }
 
@@ -333,7 +333,7 @@ impl <'a> Game<'a> {
 
         // 判断球和玩家挡板的碰撞
         if !self.ball.stuck {
-            if let Some(direction, vec) = check_collisions_aabb_round(&self.ball, &self.player) {
+            if let Some((direction, vec)) = check_collisions_aabb_round(&self.ball, &self.player) {
                 let player_center = self.player.position.x + self.player.size.x / 2.0;
                 // 检查碰到挡板哪个位置，并根据位置来改变速度
                 let distance = self.ball.game_object.position.x + self.ball.radius - player_center;
@@ -374,6 +374,7 @@ impl <'a> Game<'a> {
 }
 
 
+#[derive(PartialEq, Eq, Clone, Copy)]
 enum Direction {
     Up,
 
@@ -394,10 +395,10 @@ static COMPASS: [(Direction, Vector2<f32>); 4] = [
 /// 判断碰撞方向，vector向量为球碰撞的方向向量，其中四个对比方向也是按照球的角度来思考的
 fn vector_direction(vector: Vector2<f32>) -> Direction {
     let mut max = 0.0_f32;
-    let best_match = Direction::Up;
+    let mut best_match = Direction::Up;
 
     let normalize = vector.normalize();
-    for direction in COMPASS {
+    for direction in COMPASS.iter() {
         let dot = normalize.dot(direction.1);
         if dot > max {
             max = dot;
@@ -538,7 +539,7 @@ impl GameLevel {
     fn reset(&mut self) {
         // 重置关卡
         self.destroyed_count = 0;
-        self.destroyable_count = self.bricks.len();
+        self.destroyable_count = self.bricks.len() as u32;
         for brick in self.bricks.iter_mut() {
             brick.destroyed = false;
         }
