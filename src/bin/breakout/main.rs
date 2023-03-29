@@ -2,13 +2,14 @@
 extern crate glium;
 extern crate cgmath;
 
-use std::{collections::HashMap, fs, time::Duration};
+use std::{collections::{HashMap, VecDeque}, fs, time::Duration};
 
-use cgmath::{Point2, Vector2, Vector3, Matrix4, Deg, EuclideanSpace, InnerSpace};
+use cgmath::{Point2, Vector2, Vector3, Matrix4, Deg, EuclideanSpace, InnerSpace, Vector4};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{glutin::{event::{Event, VirtualKeyCode, KeyboardInput, ElementState}, window::CursorGrabMode, dpi::LogicalSize}, Program, texture::{Texture2d}, VertexBuffer, Display, IndexBuffer, index::PrimitiveType, uniforms::UniformValue, DrawParameters, Blend, BackfaceCullingMode};
+use glium::{glutin::{event::{Event, VirtualKeyCode, KeyboardInput, ElementState}, window::CursorGrabMode, dpi::LogicalSize}, Program, texture::{Texture2d}, VertexBuffer, Display, IndexBuffer, index::PrimitiveType, uniforms::UniformValue, DrawParameters, Blend, BackfaceCullingMode, BlendingFunction, LinearBlendingFactor};
 
+use rand::{rngs::StdRng, SeedableRng, Rng};
 use rust_opengl_learn::{uniforms::DynamicUniforms, create_program, Action, context::{LoopContext2D, KeyboardRegistry}, objectsv2::RawVertexP2T, material, event::keyboard::KeyboardInteract, start_loop_2d, utils::clamp_vec2};
 
 /// BreakOut 2D Game
@@ -116,7 +117,7 @@ impl KeyboardInteract for PlayerController {
 
     fn interact(&mut self, input: KeyboardInput) {
         let state = input.state;
-        let amount = if state == ElementState::Pressed { 2.0 } else { 0.0 };
+        let amount = if state == ElementState::Pressed { 1.0 } else { 0.0 };
         if let Some(k) = input.virtual_keycode {
             if k == VirtualKeyCode::A || k == VirtualKeyCode::Left {
                 self.amount_left = amount;
@@ -165,12 +166,14 @@ struct Game<'a> {
     keys: [bool; 1024],
     width: u32,
     height: u32,
+    projection: Matrix4<f32>,
     sprite_renderer: Option<SpriteRenderer<'a>>,
     resource_manager: ResourceManager<'a>,
     levels: Vec<GameLevel>,
     level: u32,
     player: GameObject,
     ball: BallObject,
+    particle_generator: Option<ParticleGenerator<'a>>,
 }
 
 impl <'a> Game<'a> {
@@ -184,6 +187,7 @@ impl <'a> Game<'a> {
             keys: [false; 1024],
             width,
             height,
+            projection: cgmath::ortho(0.0, width as f32, height as f32, 0.0, -1.0, 1.0),
             sprite_renderer: None,
             resource_manager: ResourceManager::new(),
             levels: Vec::new(),
@@ -199,11 +203,13 @@ impl <'a> Game<'a> {
                 texture_key: "paddle".to_string(),
             },
             ball: BallObject::new(ball_position, INITIAL_BALL_VELOCITY, "face".to_string(), ball_radius),
+            particle_generator: None
         }
     }
 
     pub fn init(&mut self, display: &Display) {
         let sprite_program = create_program("src/bin/breakout/test.vert", "src/bin/breakout/test.frag", display);
+        let particle_program = create_program("src/bin/breakout/particle.vert", "src/bin/breakout/particle.frag", display);
 
         // 加载纹理
         self.resource_manager.load_texture("background", "src/textures/background.jpg", display);
@@ -211,10 +217,10 @@ impl <'a> Game<'a> {
         self.resource_manager.load_texture("block", "src/textures/block.png", display);
         self.resource_manager.load_texture("block_solid", "src/textures/block_solid.png", display);
         self.resource_manager.load_texture("paddle", "src/textures/paddle.png", display);
+        self.resource_manager.load_texture("particle", "src/textures/particle.png", display);
         self.sprite_renderer = Some(SpriteRenderer::new(
             display, 
-            sprite_program, 
-            cgmath::ortho(0.0, self.width as f32, self.height as f32, 0.0, -1.0, 1.0)
+            sprite_program
         ));
         // 加载关卡
         let level_one = GameLevel::new("src/bin/breakout/levels/one.lvl", self.width, self.height / 2);
@@ -225,6 +231,14 @@ impl <'a> Game<'a> {
         self.levels.push(level_two);
         self.levels.push(level_three);
         self.levels.push(level_four);
+
+        // 粒子生成器
+        self.particle_generator = Some(ParticleGenerator::new(
+            display,
+            particle_program,
+            "particle".to_string(),
+            500
+        ));
     }
 
     fn update_player(&mut self, player_controller: &PlayerController, dt: Duration) {
@@ -275,6 +289,12 @@ impl <'a> Game<'a> {
             // 重置关卡和玩家挡板
             self.reset_level();
             self.reset_player();
+        }
+
+        // 更新粒子
+        if let Some(particle_generator) = &mut self.particle_generator {
+            let offset = Vector2::new(self.ball.radius / 2.0, self.ball.radius / 2.0);
+            particle_generator.update(&self.ball.game_object, 2, offset, dt);
         }
     }
 
@@ -357,18 +377,23 @@ impl <'a> Game<'a> {
                 Point2::new(0.0, 0.0), 
                 Vector2::new(self.width as f32, self.height as f32), 
                 Deg(0.0), 
-                Vector3::new(1.0, 1.0, 1.0)
+                Vector3::new(1.0, 1.0, 1.0),
+                self.projection
             );
             // 绘制关卡
             let level = self.levels.get(self.level as usize).unwrap();
-            level.draw(renderer, surface, &self.resource_manager);
+            level.draw(renderer, surface, &self.resource_manager, self.projection);
             // 绘制挡板
-            self.player.draw(renderer, surface, &self.resource_manager);
+            self.player.draw(renderer, surface, &self.resource_manager, self.projection);
 
             // 如果游戏激活，需要绘制球
             if self.state == GameState::GAME_ACTIVE {
-                self.ball.draw(renderer, surface, &self.resource_manager);
+                self.ball.draw(renderer, surface, &self.resource_manager, self.projection);
             }
+        }
+        // 渲染粒子
+        if let Some(particle_generator) = &self.particle_generator {
+            particle_generator.draw(surface, &self.resource_manager, self.projection);
         }
     }
 }
@@ -449,13 +474,12 @@ struct SpriteRenderer<'a> {
     shader: Program,
     vertex_buffer: VertexBuffer<RawVertexP2T>,
     index_buffer: IndexBuffer<u16>,
-    projection: Matrix4<f32>,
     draw_parameters: DrawParameters<'a>,
 }
 
 impl <'a> SpriteRenderer<'a> {
 
-    pub fn new(display: &Display, shader: Program, projection: Matrix4<f32>) -> Self {
+    pub fn new(display: &Display, shader: Program) -> Self {
         Self { 
             shader: shader,
             vertex_buffer: VertexBuffer::new(display, &[
@@ -468,7 +492,6 @@ impl <'a> SpriteRenderer<'a> {
                 RawVertexP2T { position: [1.0, 0.0], texture: [1.0, 0.0] },
             ]).unwrap(),
             index_buffer: IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 3, 4, 5]).unwrap(),
-            projection,
             draw_parameters: DrawParameters {
                 blend: Blend::alpha_blending(),
                 backface_culling: BackfaceCullingMode::CullClockwise,
@@ -477,7 +500,7 @@ impl <'a> SpriteRenderer<'a> {
         }
     }
 
-    fn draw_sprite<S: Surface>(&self, surface: &mut S, texture: &Texture2d, position: Point2<f32>, size: Vector2<f32>, rotate: Deg<f32>, color: Vector3<f32>) {
+    fn draw_sprite<S: Surface>(&self, surface: &mut S, texture: &Texture2d, position: Point2<f32>, size: Vector2<f32>, rotate: Deg<f32>, color: Vector3<f32>, projection: Matrix4<f32>) {
         let mut uniforms = DynamicUniforms::new();
 
         let model = Matrix4::from_translation(Vector3::new(position.x, position.y, 0.0));
@@ -486,7 +509,7 @@ impl <'a> SpriteRenderer<'a> {
         let model = model * Matrix4::from_translation(Vector3::new(-0.5 * size.x, -0.5 * size.y, 0.0));
         let model = model * Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
 
-        uniforms.add_str_key_value("projection", UniformValue::Mat4(self.projection.into()));
+        uniforms.add_str_key_value("projection", UniformValue::Mat4(projection.into()));
         uniforms.add_str_key_value("model", UniformValue::Mat4(model.into()));
         uniforms.add_str_key_value("spriteColor", UniformValue::Vec3(color.into()));
         uniforms.add_str_key("image", texture);
@@ -546,11 +569,11 @@ impl GameLevel {
     }
 
     // 渲染关卡
-    fn draw<T: Surface>(&self, renderer: &SpriteRenderer, surface: &mut T, resource_manager: &ResourceManager) {
+    fn draw<T: Surface>(&self, renderer: &SpriteRenderer, surface: &mut T, resource_manager: &ResourceManager, projection: Matrix4<f32>) {
         // 渲染所有未被破坏的砖块
         for brick in self.bricks.iter() {
             if !brick.destroyed {
-                brick.draw(renderer, surface, resource_manager);
+                brick.draw(renderer, surface, resource_manager, projection);
             }
         }
     }
@@ -628,9 +651,9 @@ struct GameObject {
 
 impl GameObject {
     
-    fn draw<T: Surface>(&self, renderer: &SpriteRenderer, surface: &mut T, resource_manager: &ResourceManager) {
+    fn draw<T: Surface>(&self, renderer: &SpriteRenderer, surface: &mut T, resource_manager: &ResourceManager, projection: Matrix4<f32>) {
         let texture = resource_manager.get_texture(self.texture_key.as_str());
-        renderer.draw_sprite(surface, texture, self.position, self.size, self.rotation, self.color);
+        renderer.draw_sprite(surface, texture, self.position, self.size, self.rotation, self.color, projection);
     }
 }
 
@@ -694,9 +717,137 @@ impl BallObject {
         
     }
 
-    fn draw<T: Surface>(&self, renderer: &SpriteRenderer, surface: &mut T, resource_manager: &ResourceManager) {
+    fn draw<T: Surface>(&self, renderer: &SpriteRenderer, surface: &mut T, resource_manager: &ResourceManager, projection: Matrix4<f32>) {
         let game_object = &self.game_object;
         let texture = resource_manager.get_texture(&game_object.texture_key);
-        renderer.draw_sprite(surface, texture, game_object.position, game_object.size, game_object.rotation, game_object.color);
+        renderer.draw_sprite(surface, texture, game_object.position, game_object.size, game_object.rotation, game_object.color, projection);
     }
+}
+
+
+struct Particle {
+    position: Point2<f32>,
+    velocity: Vector2<f32>,
+    color: Vector4<f32>,
+    life: f32,
+}
+
+impl Particle {
+    pub fn new(position: Point2<f32>, velocity: Vector2<f32>, color: Vector4<f32>, life: f32) -> Self {
+        Particle { position, velocity, color, life }
+    }
+}
+
+
+struct ParticleGenerator<'a> {
+    shader: Program,
+    particles: Vec<Particle>,
+    amount: u32,
+    texture_key: String,
+    vertex_buffer: VertexBuffer<RawVertexP2T>,
+    index_buffer: IndexBuffer<u16>,
+    draw_parameters: DrawParameters<'a>,
+    deactive: VecDeque<usize>,
+    rng: StdRng,
+}
+
+impl <'a> ParticleGenerator<'a> {
+
+    pub fn new(display: &Display, shader: Program, texture_key: String, amount: u32) -> Self {
+        let (particles, deactive) = {
+            let mut vec = Vec::with_capacity(amount as usize);
+            let mut deactive = VecDeque::with_capacity(amount as usize);
+            for i in 0..amount {
+                vec.push(Particle::new(Point2::new(0.0, 0.0), Vector2::new(0.0, 0.0), Vector4::new(1.0, 1.0, 1.0, 1.0), 0.0));
+                deactive.push_back(i as usize);
+            }
+            (vec, deactive)
+        };
+
+        ParticleGenerator {
+            shader,
+            particles,
+            amount,
+            texture_key,
+            vertex_buffer: VertexBuffer::new(display, &[
+                RawVertexP2T { position: [0.0, 1.0], texture: [0.0, 1.0] },
+                RawVertexP2T { position: [1.0, 0.0], texture: [1.0, 0.0] },
+                RawVertexP2T { position: [0.0, 0.0], texture: [0.0, 0.0] },
+
+                RawVertexP2T { position: [0.0, 1.0], texture: [0.0, 1.0] },
+                RawVertexP2T { position: [1.0, 1.0], texture: [1.0, 1.0] },
+                RawVertexP2T { position: [1.0, 0.0], texture: [1.0, 0.0] },
+            ]).unwrap(),
+            index_buffer: IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0u16, 1, 2, 3, 4, 5]).unwrap(),
+            draw_parameters: DrawParameters {
+                blend: Blend {
+                    color: BlendingFunction::Addition {
+                        source: LinearBlendingFactor::SourceAlpha,
+                        destination: LinearBlendingFactor::One,
+                    },
+                    alpha: BlendingFunction::Addition {
+                        source: LinearBlendingFactor::SourceAlpha,
+                        destination: LinearBlendingFactor::One
+                    },
+                    constant_value: (0.0, 0.0, 0.0, 0.0)
+                },
+                backface_culling: BackfaceCullingMode::CullClockwise,
+                .. Default::default()
+            },
+            deactive,
+            rng: StdRng::seed_from_u64(0),
+        }
+    }
+
+    fn update(&mut self, object: &GameObject, new_particles: u32, offset: Vector2<f32>, dt: Duration) {
+        let dt = dt.as_secs_f32();
+        
+        for _ in 0..new_particles {
+            // 产生新的粒子
+            if let Some(index) = self.deactive.pop_front() {
+                let particle = self.particles.get_mut(index).unwrap();
+                let rng = &mut self.rng;
+                respawn_particle(rng, particle, object, offset);
+            }
+        }
+
+        // 更新所有粒子
+        for (i, particle) in self.particles.iter_mut().enumerate() {
+            if particle.life > 0.0 {
+                particle.life -= dt;
+                particle.position -= particle.velocity * dt;
+                particle.color.w -= dt * 2.5;
+
+                if particle.life <= 0.0 {
+                    self.deactive.push_back(i);
+                }
+            }
+        }
+    }
+
+    fn draw<T: Surface>(&self, surface: &mut T, resource_manager: &ResourceManager, projection: Matrix4<f32>) {
+        let texture = resource_manager.get_texture(&self.texture_key);
+
+        let mut uniforms = DynamicUniforms::new();
+
+        uniforms.add_str_key_value("projection", UniformValue::Mat4(projection.into()));
+        uniforms.add_str_key("sprite", texture);
+
+        for particle in self.particles.iter() {
+            if particle.life > 0.0 {
+                uniforms.add_str_key_value("offset", UniformValue::Vec2(particle.position.into()));
+                uniforms.add_str_key_value("color", UniformValue::Vec4(particle.color.into()));
+                surface.draw(&self.vertex_buffer, &self.index_buffer, &self.shader, &uniforms, &self.draw_parameters).unwrap();
+            }
+        }
+    }
+}
+
+fn respawn_particle(rng: &mut StdRng, particle: &mut Particle, object: &GameObject, offset: Vector2<f32>) {
+    let random = (rng.gen_range(0..100) - 50) as f32 / 10.0;
+    let color = 0.5 + (rng.gen_range(0..100) as f32 / 100.0);
+    particle.position = object.position + offset + Vector2::new(random, random);
+    particle.color = Vector4::new(color, color, color, 1.0);
+    particle.life = 1.0;
+    particle.velocity = object.velocity * 0.1;
 }
