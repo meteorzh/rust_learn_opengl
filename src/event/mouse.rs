@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use glium::glutin::event::{MouseScrollDelta, DeviceEvent};
+use glium::glutin::event::{MouseScrollDelta, DeviceEvent, ElementState, MouseButton};
 
 use crate::camera::Camera;
 
@@ -22,44 +22,46 @@ pub trait MouseEventHandler {
 pub trait MouseInteract {
     
     /// 处理鼠标移动事件
-    fn motion_interact(&self, delta: (f64, f64));
+    fn motion_interact(&mut self, delta: (f64, f64));
 
     /// 处理鼠标滚轮事件
-    fn wheel_interact(&self, delta: MouseScrollDelta);
+    fn wheel_interact(&mut self, delta: MouseScrollDelta);
+
+    fn input_interact(&mut self, state: ElementState, button: MouseButton);
 }
 
-pub struct MouseHandler<'a> {
+// pub struct MouseHandler<'a> {
 
-    interacts: Vec<&'a dyn MouseInteract>,
-}
+//     interacts: Vec<&'a dyn MouseInteract>,
+// }
 
-impl <'a> MouseHandler<'a> {
+// impl <'a> MouseHandler<'a> {
 
-    pub fn new() -> MouseHandler<'a> {
-        MouseHandler {
-            interacts: Vec::new(),
-        }
-    }
+//     pub fn new() -> MouseHandler<'a> {
+//         MouseHandler {
+//             interacts: Vec::new(),
+//         }
+//     }
 
-    pub fn register(&mut self, interact: &'a impl MouseInteract) {
-        self.interacts.push(interact);
-    }
+//     pub fn register(&mut self, interact: &'a impl MouseInteract) {
+//         self.interacts.push(interact);
+//     }
 
-    pub fn process_mouse(&self, event: &DeviceEvent) {
-        match event {
-            DeviceEvent::MouseMotion { delta } => {
-                for interact in self.interacts.iter() {
-                    (*interact).motion_interact(*delta);
-                }
-            },
-            DeviceEvent::MouseWheel { delta } => {
-                for interact in self.interacts.iter() {
-                    (*interact).wheel_interact(*delta);
-                }
-            },
-            _ => {
-                println!("unsupported mouse event: {:#?}", event);
-            },
-        }
-    }
-}
+//     pub fn process_mouse(&self, event: &DeviceEvent) {
+//         match event {
+//             DeviceEvent::MouseMotion { delta } => {
+//                 for interact in self.interacts.iter() {
+//                     (*interact).motion_interact(*delta);
+//                 }
+//             },
+//             DeviceEvent::MouseWheel { delta } => {
+//                 for interact in self.interacts.iter() {
+//                     (*interact).wheel_interact(*delta);
+//                 }
+//             },
+//             _ => {
+//                 println!("unsupported mouse event: {:#?}", event);
+//             },
+//         }
+//     }
+// }

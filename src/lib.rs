@@ -1,7 +1,7 @@
 use std::{collections::{HashMap}, rc::Rc, fs::{self}, time::{Instant, Duration}};
 
 use cgmath::{Vector3, Zero, Vector2};
-use context::{LoopContext, LoopContext2D};
+use context::{LoopContext, LoopContext2D, EventHandler};
 
 use event::keyboard::KeyboardInteract;
 use glium::{implement_vertex, vertex::VertexBufferAny, index::{IndexBufferAny, self}, Display, IndexBuffer, program::{SourceCode, ProgramCreationInput}, Program, glutin::{event_loop::{EventLoop, ControlFlow}, event::{Event, WindowEvent, StartCause, KeyboardInput, VirtualKeyCode, ElementState}}};
@@ -187,7 +187,7 @@ pub fn start_loop<F>(event_loop: EventLoop<()>, mut ctx: LoopContext, mut render
 
 /// 开始渲染循环2D
 pub fn start_loop_2d<F, T>(event_loop: EventLoop<()>, mut ctx: LoopContext2D<T>, mut render_func: F) 
-    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext2D<T>, Duration) -> Action, T: 'static + KeyboardInteract {
+    where F: 'static + FnMut(Option<Event<'_, ()>>, &mut LoopContext2D<T>, Duration) -> Action, T: 'static + EventHandler {
 
     let mut last_frame = Instant::now();
 

@@ -1,9 +1,9 @@
 use std::{time::Duration, collections::HashMap, sync::Mutex};
 
-use glium::glutin::event::{Event, WindowEvent, VirtualKeyCode, KeyboardInput};
+use glium::glutin::event::{Event, WindowEvent, VirtualKeyCode, KeyboardInput, DeviceEvent, MouseScrollDelta};
 use once_cell::sync::{Lazy};
 
-use crate::{event::{keyboard::{KeyboardHandler, KeyboardInteract}}, camera::{Camera, CameraController}};
+use crate::{event::{keyboard::{KeyboardHandler, KeyboardInteract}, mouse::MouseInteract, MouseKeyboardInteract}, camera::{Camera, CameraController}};
 
 /// 全局变量存储对象
 #[derive(Debug)]
@@ -156,45 +156,40 @@ impl <T: KeyboardInteract> KeyboardRegistry<T> for KeyboardRegister<T> {
 }
 
 
-/// 2D渲染循环上下文
-pub struct LoopContext2D<T: KeyboardInteract> {
+pub trait EventHandler {
 
-    keyboard_register: KeyboardRegister<T>,
+    fn handle_event(&mut self, event: &Event<()>);
 }
 
-impl <T: KeyboardInteract> LoopContext2D<T> {
 
-    pub fn new() -> LoopContext2D<T> {
-        LoopContext2D {
-            keyboard_register: KeyboardRegister::new(),
-        }
+
+/// 2D渲染循环上下文
+pub struct LoopContext2D<T: EventHandler> {
+
+    handlers: HashMap<String, T>,
+}
+
+impl <T: EventHandler> LoopContext2D<T> {
+
+    pub fn new() -> Self {
+        LoopContext2D { handlers: HashMap::new() }
+    }
+
+    pub fn register(&mut self, key: &str, handler: T) {
+        self.handlers.insert(key.to_string(), handler);
+    }
+
+    pub fn get(&self, key: &str) -> &T {
+        self.handlers.get(key).unwrap()
+    }
+
+    pub fn get_mut(&mut self, key: &str) -> &mut T {
+        self.handlers.get_mut(key).unwrap()
     }
 
     pub fn handle_event(&mut self, event: &Event<()>) {
-        match event {
-            Event::WindowEvent { event, .. } => match event {
-                // key input
-                WindowEvent::KeyboardInput { input, .. } => {
-                    self.keyboard_register.handle_keyboard(*input);
-                },
-                _ => {},
-            },
-            _ => {},
+        for (_, handler) in self.handlers.iter_mut() {
+            handler.handle_event(event);
         }
-    }
-}
-
-impl <T: KeyboardInteract> KeyboardRegistry<T> for LoopContext2D<T> {
-
-    fn register(&mut self, key: String, keyboard_interact: T) {
-        self.keyboard_register.register(key, keyboard_interact);
-    }
-
-    fn get(&self, key: String) -> &T {
-        self.keyboard_register.get(key)
-    }
-
-    fn handle_keyboard(&mut self, input: KeyboardInput) {
-        self.keyboard_register.handle_keyboard(input);
     }
 }

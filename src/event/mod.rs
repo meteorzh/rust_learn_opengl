@@ -3,10 +3,16 @@ use glium::glutin::{event::{Event, WindowEvent, DeviceEvent}};
 
 use crate::context::LoopContext;
 
+use self::{mouse::MouseInteract, keyboard::KeyboardInteract};
+
 // use self::{mouse::{MouseHandler, MouseInteract}, keyboard::{KeyboardHandler, KeyboardInteract}};
 
 pub mod mouse;
 pub mod keyboard;
+
+pub trait MouseKeyboardInteract: MouseInteract + KeyboardInteract {
+    
+}
 
 // pub struct EventHandler<'a> {
 

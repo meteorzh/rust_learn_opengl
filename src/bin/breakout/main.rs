@@ -7,10 +7,10 @@ use std::{collections::{HashMap, VecDeque}, fs, time::Duration};
 use cgmath::{Point2, Vector2, Vector3, Matrix4, Deg, EuclideanSpace, InnerSpace, Vector4};
 #[allow(unused_imports)]
 use glium::{glutin::{self, event, window, event_loop}, Surface};
-use glium::{glutin::{event::{Event, VirtualKeyCode, KeyboardInput, ElementState}, window::CursorGrabMode, dpi::LogicalSize}, Program, texture::{Texture2d}, VertexBuffer, Display, IndexBuffer, index::PrimitiveType, uniforms::UniformValue, DrawParameters, Blend, BackfaceCullingMode, BlendingFunction, LinearBlendingFactor};
+use glium::{glutin::{event::{Event, VirtualKeyCode, KeyboardInput, ElementState, WindowEvent, DeviceEvent, MouseScrollDelta, MouseButton}, window::CursorGrabMode, dpi::LogicalSize}, Program, texture::{Texture2d}, VertexBuffer, Display, IndexBuffer, index::PrimitiveType, uniforms::UniformValue, DrawParameters, Blend, BackfaceCullingMode, BlendingFunction, LinearBlendingFactor};
 
 use rand::{rngs::StdRng, SeedableRng, Rng};
-use rust_opengl_learn::{uniforms::DynamicUniforms, create_program, Action, context::{LoopContext2D, KeyboardRegistry}, objectsv2::RawVertexP2T, material, event::keyboard::KeyboardInteract, start_loop_2d, utils::clamp_vec2};
+use rust_opengl_learn::{uniforms::DynamicUniforms, create_program, Action, context::{LoopContext2D, EventHandler}, objectsv2::RawVertexP2T, material, event::{keyboard::KeyboardInteract, mouse::MouseInteract}, start_loop_2d, utils::clamp_vec2};
 
 /// BreakOut 2D Game
 fn main() {
@@ -27,10 +27,10 @@ fn main() {
 
     breakout.init(&display);
 
-    let player_controller = PlayerController::new(500.0);
+    let player_controller = PlayerController::new();
 
-    let mut loop_context = LoopContext2D::<KeyboardInteractType>::new();
-    loop_context.register("player_controller".to_string(), KeyboardInteractType::PlayerController(player_controller));
+    let mut loop_context = LoopContext2D::<EventHandlerType>::new();
+    loop_context.register("player_controller", EventHandlerType::PlayerController(player_controller));
 
     start_loop_2d(event_loop, loop_context, move |_: Option<Event<()>>, ctx, dt| {
         // 创建默认帧
@@ -39,8 +39,8 @@ fn main() {
 
         // 获取player_controller
         let player_controller = {
-            match ctx.get("player_controller".to_string()) {
-                KeyboardInteractType::PlayerController(player_controller) => player_controller
+            match ctx.get_mut("player_controller") {
+                EventHandlerType::PlayerController(player_controller) => player_controller
             }
         };
 
@@ -59,30 +59,65 @@ fn main() {
 
 /// 键盘功能类型，包含多种键盘功能的支持
 /// 为什么这样实现，可见文章：https://bennett.dev/dont-use-boxed-trait-objects-for-struct-internals/
-enum KeyboardInteractType {
+enum EventHandlerType {
 
     PlayerController(PlayerController),
 }
 
-impl KeyboardInteract for KeyboardInteractType {
+impl EventHandlerType {
 
-    fn init(&self) {
-        
-    }
-
-    fn interact_keycodes(&self) -> Vec<VirtualKeyCode> {
+    fn handle_mouse_motion(&mut self, delta: (f64, f64)) {
         match self {
-            KeyboardInteractType::PlayerController(player_controller) => {
-                player_controller.interact_keycodes()
+            EventHandlerType::PlayerController(player_controller) => {
+                player_controller.motion_interact(delta);
             }
         }
     }
 
-    fn interact(&mut self, input: KeyboardInput) {
+    fn handle_mouse_wheel(&mut self, _: MouseScrollDelta) {
+        
+    }
+
+    fn handle_mouse_input(&mut self, state: ElementState, button: MouseButton) {
         match self {
-            KeyboardInteractType::PlayerController(player_controller) => {
+            EventHandlerType::PlayerController(player_controller) => {
+                player_controller.input_interact(state, button);
+            }
+        }
+    }
+
+    fn handle_keyboard(&mut self, input: KeyboardInput) {
+        match self {
+            EventHandlerType::PlayerController(player_controller) => {
                 player_controller.interact(input);
             }
+        }
+    }
+}
+
+impl EventHandler for EventHandlerType {
+
+    fn handle_event(&mut self, event: &Event<()>) {
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::KeyboardInput { input, .. } => {
+                    self.handle_keyboard(*input);
+                },
+                WindowEvent::MouseInput { state, button, .. } => {
+                    self.handle_mouse_input(*state, *button);
+                },
+                _ => {},
+            },
+            Event::DeviceEvent { event, .. } => match event {
+                DeviceEvent::MouseMotion { delta } => {
+                    self.handle_mouse_motion(*delta);
+                },
+                DeviceEvent::MouseWheel { delta } => {
+                    self.handle_mouse_wheel(*delta);
+                },
+                _ => {},
+            },
+            _ => {},
         }
     }
 }
@@ -91,17 +126,34 @@ impl KeyboardInteract for KeyboardInteractType {
 struct PlayerController {
     amount_left: f32,
     amount_right: f32,
+    amount_mouse_x: f32,
     launch_trigger: bool,
-    velocity: f32,
 }
 
 impl PlayerController {
-    pub fn new(velocity: f32) -> Self {
+    pub fn new() -> Self {
         PlayerController {
             amount_left: 0.0,
             amount_right: 0.0,
+            amount_mouse_x: 0.0,
             launch_trigger: false,
-            velocity
+        }
+    }
+}
+
+impl MouseInteract for PlayerController {
+
+    fn motion_interact(&mut self, delta: (f64, f64)) {
+        self.amount_mouse_x = delta.0 as f32;
+    }
+
+    fn wheel_interact(&mut self, _: MouseScrollDelta) {
+        todo!()
+    }
+
+    fn input_interact(&mut self, state: ElementState, button: MouseButton) {
+        if button == MouseButton::Left {
+            self.launch_trigger = state == ElementState::Released;
         }
     }
 }
@@ -109,6 +161,7 @@ impl PlayerController {
 impl KeyboardInteract for PlayerController {
 
     fn init(&self) {
+        todo!()
     }
 
     fn interact_keycodes(&self) -> Vec<VirtualKeyCode> {
@@ -128,6 +181,7 @@ impl KeyboardInteract for PlayerController {
             }
         }
     }
+    
 }
 
 /// 游戏状态
@@ -241,40 +295,54 @@ impl <'a> Game<'a> {
         ));
     }
 
-    fn update_player(&mut self, player_controller: &PlayerController, dt: Duration) {
+    fn update_player(&mut self, player_controller: &mut PlayerController, dt: Duration) {
         if self.state != GameState::GAME_ACTIVE {
             // 游戏尚未开始，不做操作
             return;
         }
         // 计算移动量
-        let amount = player_controller.amount_right - player_controller.amount_left;
+        let amount = {
+            // 鼠标优先
+            if player_controller.amount_mouse_x != 0.0 {
+                let amount = player_controller.amount_mouse_x * 0.7;
+                player_controller.amount_mouse_x = 0.0;
+                amount
+            } else {
+                player_controller.amount_right - player_controller.amount_left
+            }
+        };
         if amount != 0.0 {
             // 有移动量才需要更新挡板位置
             let amount = amount * self.player.velocity.x * dt.as_secs_f32();
+            let mut move_stuck_ball = false;
             // 更新玩家挡板的位置
             let position = &mut self.player.position;
             if amount > 0.0 {
                 // 往右
-                if position.x <= (self.width as f32 - self.player.size.x) {
-                    position.x += amount;
+                let max_x = self.width as f32 - self.player.size.x;
+                if position.x <= max_x {
+                    position.x = num_traits::clamp_max(position.x + amount, max_x);
+                    move_stuck_ball = true;
                 }
             } else {
                 // 往左
                 if position.x >= 0.0 {
-                    position.x += amount;
+                    position.x = num_traits::clamp_min(position.x + amount, 0.0);
+                    move_stuck_ball = true;
                 }
             }
 
             // 若球被固定，更新球的位置
-            if self.ball.stuck {
-                self.ball.game_object.position.x += amount;
+            if self.ball.stuck && move_stuck_ball {
+                self.ball.game_object.position.x = position.x + self.player.size.x / 2.0 - self.ball.radius;
             }
         }
 
         // 如果球当前是被固定的状态，且标记为发射，则修改球的固定状态
-        if self.ball.stuck && player_controller.launch_trigger{
+        if self.ball.stuck && player_controller.launch_trigger {
             self.ball.stuck = false;
         }
+        player_controller.launch_trigger = false;
     }
 
     fn update(&mut self, dt: Duration) {
@@ -309,6 +377,7 @@ impl <'a> Game<'a> {
         self.player.position = player_position;
         // 计算球的初始位置，球的位置应该在挡板上边
         let ball_position = player_position + Vector2::new(self.player.size.x / 2.0 - self.ball.radius, -self.ball.radius * 2.0);
+        self.ball.reset(ball_position, INITIAL_BALL_VELOCITY);
         self.ball.stuck = true;
     }
 
@@ -353,7 +422,7 @@ impl <'a> Game<'a> {
 
         // 判断球和玩家挡板的碰撞
         if !self.ball.stuck {
-            if let Some((direction, vec)) = check_collisions_aabb_round(&self.ball, &self.player) {
+            if let Some((_, _)) = check_collisions_aabb_round(&self.ball, &self.player) {
                 let player_center = self.player.position.x + self.player.size.x / 2.0;
                 // 检查碰到挡板哪个位置，并根据位置来改变速度
                 let distance = self.ball.game_object.position.x + self.ball.radius - player_center;
