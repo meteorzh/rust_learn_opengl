@@ -9,8 +9,11 @@ use cgmath::{Point2, Vector2, Vector3, Matrix4, Deg, EuclideanSpace, InnerSpace,
 use glium::{glutin::{self, event, window, event_loop}, Surface};
 use glium::{glutin::{event::{Event, VirtualKeyCode, KeyboardInput, ElementState, WindowEvent, DeviceEvent, MouseScrollDelta, MouseButton}, window::CursorGrabMode, dpi::LogicalSize}, Program, texture::{Texture2d}, VertexBuffer, Display, IndexBuffer, index::PrimitiveType, uniforms::UniformValue, DrawParameters, Blend, BackfaceCullingMode, BlendingFunction, LinearBlendingFactor};
 
+use post_processor::PostProcessor;
 use rand::{rngs::StdRng, SeedableRng, Rng};
 use rust_opengl_learn::{uniforms::DynamicUniforms, create_program, Action, context::{LoopContext2D, EventHandler}, objectsv2::RawVertexP2T, material, event::{keyboard::KeyboardInteract, mouse::MouseInteract}, start_loop_2d, utils::clamp_vec2};
+
+mod post_processor;
 
 /// BreakOut 2D Game
 fn main() {
@@ -49,7 +52,7 @@ fn main() {
         // 更新游戏中其它数据
         breakout.update(dt);
 
-        breakout.render(&mut target);
+        breakout.render(&mut target, dt);
 
         target.finish().unwrap();
 
@@ -228,6 +231,7 @@ struct Game<'a> {
     player: GameObject,
     ball: BallObject,
     particle_generator: Option<ParticleGenerator<'a>>,
+    effects: Option<PostProcessor>,
 }
 
 impl <'a> Game<'a> {
@@ -257,13 +261,15 @@ impl <'a> Game<'a> {
                 texture_key: "paddle".to_string(),
             },
             ball: BallObject::new(ball_position, INITIAL_BALL_VELOCITY, "face".to_string(), ball_radius),
-            particle_generator: None
+            particle_generator: None,
+            effects: None,
         }
     }
 
     pub fn init(&mut self, display: &Display) {
         let sprite_program = create_program("src/bin/breakout/test.vert", "src/bin/breakout/test.frag", display);
         let particle_program = create_program("src/bin/breakout/particle.vert", "src/bin/breakout/particle.frag", display);
+        let effects_program = create_program("src/bin/breakout/post_processing.vert", "src/bin/breakout/post_processing.frag", display);
 
         // 加载纹理
         self.resource_manager.load_texture("background", "src/textures/background.jpg", display);
@@ -293,6 +299,9 @@ impl <'a> Game<'a> {
             "particle".to_string(),
             500
         ));
+
+        // 后期处理
+        self.effects = Some(PostProcessor::new(display, effects_program, self.width, self.height));
     }
 
     fn update_player(&mut self, player_controller: &mut PlayerController, dt: Duration) {
@@ -364,6 +373,11 @@ impl <'a> Game<'a> {
             let offset = Vector2::new(self.ball.radius / 2.0, self.ball.radius / 2.0);
             particle_generator.update(&self.ball.game_object, 2, offset, dt);
         }
+
+        // 更新后期处理对象
+        if let Some(effects) = &mut self.effects {
+            effects.update(dt);
+        }
     }
 
     fn reset_level(&mut self) {
@@ -391,6 +405,11 @@ impl <'a> Game<'a> {
                     if !brick.is_solid {
                         // 摧毁砖块
                         brick.destroyed = true;
+                    } else {
+                        // 实心砖块，激活shake特效
+                        if let Some(effects) = &mut self.effects {
+                            effects.start_shake(0.05);
+                        }
                     }
                     // 处理碰撞
                     let ball_velocity = &mut self.ball.game_object.velocity;
@@ -437,32 +456,40 @@ impl <'a> Game<'a> {
         }
     }
 
-    fn render<T: Surface>(&self, surface: &mut T) {
-        if let Some(renderer) = &self.sprite_renderer {
-            // 绘制背景
-            renderer.draw_sprite(
-                surface, 
-                self.resource_manager.get_texture("background"), 
-                Point2::new(0.0, 0.0), 
-                Vector2::new(self.width as f32, self.height as f32), 
-                Deg(0.0), 
-                Vector3::new(1.0, 1.0, 1.0),
-                self.projection
-            );
-            // 绘制关卡
-            let level = self.levels.get(self.level as usize).unwrap();
-            level.draw(renderer, surface, &self.resource_manager, self.projection);
-            // 绘制挡板
-            self.player.draw(renderer, surface, &self.resource_manager, self.projection);
-
-            // 如果游戏激活，需要绘制球
-            if self.state == GameState::GAME_ACTIVE {
-                self.ball.draw(renderer, surface, &self.resource_manager, self.projection);
-            }
-        }
-        // 渲染粒子
-        if let Some(particle_generator) = &self.particle_generator {
-            particle_generator.draw(surface, &self.resource_manager, self.projection);
+    fn render<T: Surface>(&mut self, surface: &mut T, dt: Duration) {
+        // 后期处理
+        if let Some(effects) = &mut self.effects {
+            effects.post_process(|framebuffer| {
+                if let Some(renderer) = &self.sprite_renderer {
+                    // 绘制背景
+                    renderer.draw_sprite(
+                        framebuffer, 
+                        self.resource_manager.get_texture("background"), 
+                        Point2::new(0.0, 0.0), 
+                        Vector2::new(self.width as f32, self.height as f32), 
+                        Deg(0.0), 
+                        Vector3::new(1.0, 1.0, 1.0),
+                        self.projection
+                    );
+                    // 绘制关卡
+                    let level = self.levels.get(self.level as usize).unwrap();
+                    level.draw(renderer, framebuffer, &self.resource_manager, self.projection);
+                    // 绘制挡板
+                    self.player.draw(renderer, framebuffer, &self.resource_manager, self.projection);
+        
+                    // 如果游戏激活，需要绘制球
+                    if self.state == GameState::GAME_ACTIVE {
+                        self.ball.draw(renderer, framebuffer, &self.resource_manager, self.projection);
+                    }
+                }
+                // 渲染粒子
+                if let Some(particle_generator) = &self.particle_generator {
+                    particle_generator.draw(framebuffer, &self.resource_manager, self.projection);
+                }
+            });
+            
+            // 将后期处理结果渲染到指定surface
+            effects.render(surface, dt);
         }
     }
 }
