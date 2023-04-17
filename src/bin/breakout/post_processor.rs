@@ -27,8 +27,8 @@ struct Actual {
 pub struct PostProcessor {
     program: Program,
     actual: Actual,
-    confuse: bool,
-    chaos: bool,
+    pub confuse: bool,
+    pub chaos: bool,
     shake: bool,
     shake_time: f32,
     width: u32,

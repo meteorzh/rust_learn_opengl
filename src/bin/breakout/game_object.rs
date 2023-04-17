@@ -4,6 +4,7 @@ use glium::Surface;
 use crate::{ResourceManager, sprite_renderer::SpriteRenderer};
 
 /// 游戏物体对象
+#[derive(Debug)]
 pub struct GameObject {
     pub position: Point2<f32>,
     pub size: Vector2<f32>,

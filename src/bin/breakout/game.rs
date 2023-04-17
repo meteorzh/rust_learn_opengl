@@ -1,10 +1,12 @@
-use std::time::Duration;
+use std::{time::Duration, collections::HashMap, thread};
 
 use cgmath::{Vector2, Matrix4, Point2, Vector3, Deg, InnerSpace, EuclideanSpace};
 use glium::{Display, Surface};
+use rand::{rngs::StdRng, SeedableRng, Rng};
+use rodio::{OutputStream, Sink, Source};
 use rust_opengl_learn::{create_program, utils::clamp_vec2};
 
-use crate::{game_object::GameObject, sprite_renderer::SpriteRenderer, resource_manager::ResourceManager, game_level::GameLevel, ball_object::BallObject, particle_generator::ParticleGenerator, post_processor::PostProcessor, PlayerController};
+use crate::{game_object::GameObject, sprite_renderer::SpriteRenderer, resource_manager::{ResourceManager, load_audio}, game_level::GameLevel, ball_object::BallObject, particle_generator::ParticleGenerator, post_processor::PostProcessor, PlayerController, power_up::{PowerUp, PowerUpType}};
 
 /// 游戏状态
 #[derive(PartialEq, Eq)]
@@ -30,6 +32,9 @@ pub struct Game<'a> {
     ball: BallObject,
     particle_generator: Option<ParticleGenerator<'a>>,
     effects: Option<PostProcessor>,
+    power_ups: Vec<PowerUp>,
+    rng: StdRng,
+    audio_effects_sink: Sink,
 }
 
 impl <'a> Game<'a> {
@@ -38,6 +43,10 @@ impl <'a> Game<'a> {
         let player_position = Point2::new(width as f32 / 2.0 - player_size.x / 2.0, height as f32 - player_size.y);
         // 计算球的初始位置，球的位置应该在挡板上边
         let ball_position = player_position + Vector2::new(player_size.x / 2.0 - ball_radius, -ball_radius * 2.0);
+        // 游戏音频sink初始化
+        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        let effect_sink = Sink::try_new(&stream_handle).unwrap();
+
         Self {
             state: GameState::GAME_ACTIVE,
             keys: [false; 1024],
@@ -61,6 +70,9 @@ impl <'a> Game<'a> {
             ball: BallObject::new(ball_position, INITIAL_BALL_VELOCITY, "face".to_string(), ball_radius),
             particle_generator: None,
             effects: None,
+            power_ups: vec![],
+            rng: StdRng::seed_from_u64(0),
+            audio_effects_sink: effect_sink,
         }
     }
 
@@ -76,6 +88,12 @@ impl <'a> Game<'a> {
         self.resource_manager.load_texture("block_solid", "src/textures/block_solid.png", display);
         self.resource_manager.load_texture("paddle", "src/textures/paddle.png", display);
         self.resource_manager.load_texture("particle", "src/textures/particle.png", display);
+        self.resource_manager.load_texture("speed", "src/textures/powerup_speed.png", display);
+        self.resource_manager.load_texture("sticky", "src/textures/powerup_sticky.png", display);
+        self.resource_manager.load_texture("passthrough", "src/textures/powerup_passthrough.png", display);
+        self.resource_manager.load_texture("increase", "src/textures/powerup_increase.png", display);
+        self.resource_manager.load_texture("confuse", "src/textures/powerup_confuse.png", display);
+        self.resource_manager.load_texture("chaos", "src/textures/powerup_chaos.png", display);
         self.sprite_renderer = Some(SpriteRenderer::new(
             display, 
             sprite_program
@@ -100,6 +118,15 @@ impl <'a> Game<'a> {
 
         // 后期处理
         self.effects = Some(PostProcessor::new(display, effects_program, self.width, self.height));
+
+        // 游戏音频，开启新线程播放
+        thread::spawn(|| {
+            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+            let main_sink = Sink::try_new(&stream_handle).unwrap();
+            let main_source = load_audio("src/audio/breakout.mp3");
+            main_sink.append(main_source);
+            main_sink.sleep_until_end();
+        });
     }
 
     pub fn update_player(&mut self, player_controller: &mut PlayerController, dt: Duration) {
@@ -172,6 +199,9 @@ impl <'a> Game<'a> {
             particle_generator.update(&self.ball.game_object, 2, offset, dt);
         }
 
+        // 更新道具
+        self.update_power_ups(dt);
+
         // 更新后期处理对象
         if let Some(effects) = &mut self.effects {
             effects.update(dt);
@@ -193,16 +223,142 @@ impl <'a> Game<'a> {
         self.ball.stuck = true;
     }
 
+    fn should_spawn(&mut self, change: f64) -> bool {
+        self.rng.gen_bool(change)
+    }
+
+    fn spawn_power_ups(&mut self, block_position: Point2<f32>) {
+        // 1/75的概率
+        if self.should_spawn(1.0 / 75.0) {
+            self.power_ups.push(PowerUp::new(PowerUpType::Speed, Vector3::new(0.5, 0.5, 1.0), 0.0, block_position, "speed"));
+        }
+        if self.should_spawn(1.0 / 75.0) {
+            self.power_ups.push(PowerUp::new(PowerUpType::Sticky, Vector3::new(1.0, 0.5, 1.0), 20.0, block_position, "sticky"));
+        }
+        if self.should_spawn(1.0 / 75.0) {
+            self.power_ups.push(PowerUp::new(PowerUpType::PassThrough, Vector3::new(0.5, 1.0, 0.5), 10.0, block_position, "passthrough"));
+        }
+        if self.should_spawn(1.0 / 75.0) {
+            self.power_ups.push(PowerUp::new(PowerUpType::PadSizeIncrease, Vector3::new(1.0, 0.6, 0.4), 0.0, block_position, "increase"));
+        }
+        
+        // debuff 1/15的概率
+        if self.should_spawn(1.0 / 15.0) {
+            self.power_ups.push(PowerUp::new(PowerUpType::Confuse, Vector3::new(1.0, 0.3, 0.3), 15.0, block_position, "confuse"));
+        }   
+        if self.should_spawn(1.0 / 15.0) {
+            self.power_ups.push(PowerUp::new(PowerUpType::Chaos, Vector3::new(0.9, 0.25, 0.25), 15.0, block_position, "chaos"));
+        }
+    }
+
+    fn update_power_ups(&mut self, dt: Duration) {
+        let delta_time = dt.as_secs_f32();
+
+        // 按道具类型统计个数
+        let mut count_map = HashMap::new();
+        for power_up in self.power_ups.iter() {
+            if let Some(v) = count_map.get_mut(&power_up.type_) {
+                *v += 1;
+            } else {
+                count_map.insert(power_up.type_, 1);
+            }
+        }
+
+        for power_up in self.power_ups.iter_mut() {
+            let object = &mut power_up.game_object;
+            object.position += object.velocity * delta_time;
+            if power_up.activated {
+                power_up.duration -= delta_time;
+                if power_up.duration <= 0.0 {
+                    // 道具失效
+                    power_up.activated = false;
+
+                    match power_up.type_ {
+                        PowerUpType::Speed => {
+                            
+                        },
+                        PowerUpType::Sticky => {
+                            if *count_map.get(&power_up.type_).unwrap() == 1 {
+                                // 此类型仅这一个生效的道具则失效
+                                self.ball.sticky = false;
+                                self.player.color = Vector3::new(1.0, 1.0, 1.0);
+                            }
+                        },
+                        PowerUpType::PassThrough => {
+                            if *count_map.get(&power_up.type_).unwrap() == 1 {
+                                self.ball.pass_through = false;
+                                self.ball.game_object.color = Vector3::new(1.0, 1.0, 1.0);
+                            }
+                        },
+                        PowerUpType::PadSizeIncrease => {
+                            
+                        },
+                        PowerUpType::Confuse => {
+                            if *count_map.get(&power_up.type_).unwrap() == 1 {
+                                if let Some(effects) = &mut self.effects {
+                                    effects.confuse = false;
+                                }
+                            }
+                        },
+                        PowerUpType::Chaos => {
+                            if *count_map.get(&power_up.type_).unwrap() == 1 {
+                                if let Some(effects) = &mut self.effects {
+                                    effects.chaos = false;
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+
+        self.power_ups.retain(|power_up| !(power_up.game_object.destroyed && !power_up.activated));
+    }
+
+    fn activate_power_up(player: &mut GameObject, ball: &mut BallObject, effects: &mut PostProcessor, power_up: &PowerUp) {
+        match power_up.type_ {
+            PowerUpType::Speed => {
+                // 球加速
+                ball.game_object.velocity *= 1.2;
+            },
+            PowerUpType::Sticky => {
+                ball.sticky = true;
+                player.color = Vector3::new(1.0, 0.5, 1.0);
+            },
+            PowerUpType::PassThrough => {
+                ball.pass_through = true;
+                ball.game_object.color = Vector3::new(1.0, 0.5, 0.5);
+            },
+            PowerUpType::PadSizeIncrease => {
+                player.size.x += 50.0;
+            },
+            PowerUpType::Confuse => {
+                if !effects.chaos {
+                    // 仅chaos未生效时才能confuse
+                    effects.confuse = true;
+                }
+            },
+            PowerUpType::Chaos => {
+                if !effects.confuse {
+                    // 仅confuse未生效时才能chaos
+                    effects.chaos = true;
+                }
+            },
+        }
+    }
+
     fn do_collisions(&mut self) {
         // 检测当前关卡中所有砖块的碰撞
         let level = self.levels.get_mut(self.level as usize).unwrap();
+        let mut power_up_positions = Vec::new();
         for brick in level.bricks.iter_mut() {
             if !brick.destroyed {
                 // 碰撞检测
-                if let Some((direction, vec)) = check_collisions_aabb_round(&self.ball, brick) {
+                if let Some((direction, vec)) = check_collisions_aabb_round(&self.ball, &brick) {
                     if !brick.is_solid {
                         // 摧毁砖块
                         brick.destroyed = true;
+                        power_up_positions.push(brick.position);
                     } else {
                         // 实心砖块，激活shake特效
                         if let Some(effects) = &mut self.effects {
@@ -210,28 +366,31 @@ impl <'a> Game<'a> {
                         }
                     }
                     // 处理碰撞
-                    let ball_velocity = &mut self.ball.game_object.velocity;
-                    let ball_position = &mut self.ball.game_object.position;
-                    match direction {
-                        Direction::Left | Direction::Right => {
-                            ball_velocity.x = -ball_velocity.x;
-                            // 重定位
-                            let penetration = self.ball.radius - num_traits::abs(vec.x);
-                            if direction == Direction::Left {
-                                ball_position.x += penetration;
-                            } else {
-                                ball_position.x -= penetration;
-                            }
-                        },
-                        Direction::Up | Direction::Down => {
-                            ball_velocity.y = -ball_velocity.y;
-                            let penetration = self.ball.radius - num_traits::abs(vec.y);
-                            if direction == Direction::Up {
-                                ball_position.y -= penetration;
-                            } else {
-                                ball_position.y += penetration;
-                            }
-                        },
+                    // 不能穿过或者碰墙则反弹，能穿过并且不是墙则穿过
+                    if !(self.ball.pass_through && !brick.is_solid) {
+                        let ball_velocity = &mut self.ball.game_object.velocity;
+                        let ball_position = &mut self.ball.game_object.position;
+                        match direction {
+                            Direction::Left | Direction::Right => {
+                                ball_velocity.x = -ball_velocity.x;
+                                // 重定位
+                                let penetration = self.ball.radius - num_traits::abs(vec.x);
+                                if direction == Direction::Left {
+                                    ball_position.x += penetration;
+                                } else {
+                                    ball_position.x -= penetration;
+                                }
+                            },
+                            Direction::Up | Direction::Down => {
+                                ball_velocity.y = -ball_velocity.y;
+                                let penetration = self.ball.radius - num_traits::abs(vec.y);
+                                if direction == Direction::Up {
+                                    ball_position.y -= penetration;
+                                } else {
+                                    ball_position.y += penetration;
+                                }
+                            },
+                        }
                     }
                 }
             }
@@ -240,6 +399,9 @@ impl <'a> Game<'a> {
         // 判断球和玩家挡板的碰撞
         if !self.ball.stuck {
             if let Some((_, _)) = check_collisions_aabb_round(&self.ball, &self.player) {
+                // 判定道具效果，当前有sticky道具开启的话，球和玩家挡板碰撞时球需要被固定
+                self.ball.stuck = self.ball.sticky;
+
                 let player_center = self.player.position.x + self.player.size.x / 2.0;
                 // 检查碰到挡板哪个位置，并根据位置来改变速度
                 let distance = self.ball.game_object.position.x + self.ball.radius - player_center;
@@ -250,6 +412,32 @@ impl <'a> Game<'a> {
                 // let tmp_velocity = Vector2::new(INITIAL_BALL_VELOCITY.x * percentage * strength, -old_velocity.y);
                 let tmp_velocity = Vector2::new(INITIAL_BALL_VELOCITY.x * percentage * strength, -num_traits::abs(old_velocity.y)); // 处理粘板问题
                 self.ball.game_object.velocity = tmp_velocity.normalize() * old_velocity.magnitude();
+            }
+        }
+
+        // 再本次渲染销毁的砖块处，生成道具
+        for position in power_up_positions {
+            self.spawn_power_ups(position);
+        }
+
+        // 判断玩家挡板和道具的碰撞
+        for power_up in self.power_ups.iter_mut() {
+            let object = &mut power_up.game_object;
+            if !object.destroyed {
+                // 超出当前窗口高度，标记道具为销毁
+                if object.position.y >= self.height as f32 {
+                    object.destroyed = true;
+                }
+
+                // 判断碰撞
+                if check_collisions_aabb_aabb(&self.player, &object) {
+                    object.destroyed = true;
+                    power_up.activated = true;
+                    // 激活道具
+                    if let Some(effects) = &mut self.effects {
+                        Game::activate_power_up(&mut self.player, &mut self.ball, effects, &power_up);
+                    }
+                }
             }
         }
     }
@@ -278,6 +466,12 @@ impl <'a> Game<'a> {
                     // 如果游戏激活，需要绘制球
                     if self.state == GameState::GAME_ACTIVE {
                         self.ball.draw(renderer, framebuffer, &self.resource_manager, self.projection);
+                    }
+                    // 渲染道具
+                    for power_up in self.power_ups.iter() {
+                        if !power_up.game_object.destroyed {
+                            power_up.game_object.draw(renderer, framebuffer, &self.resource_manager, self.projection);
+                        }
                     }
                 }
                 // 渲染粒子

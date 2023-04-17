@@ -17,6 +17,7 @@ mod game_level;
 mod game_object;
 mod particle_generator;
 mod post_processor;
+mod power_up;
 mod resource_manager;
 mod sprite_renderer;
 

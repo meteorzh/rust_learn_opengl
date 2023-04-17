@@ -8,10 +8,13 @@ use crate::{game_object::GameObject, ResourceManager, sprite_renderer::SpriteRen
 
 
 /// 游戏球
+#[derive(Debug)]
 pub struct BallObject {
     pub game_object: GameObject,
     pub radius: f32,
     pub stuck: bool,
+    pub sticky: bool,
+    pub pass_through: bool,
 }
 
 impl BallObject {
@@ -29,7 +32,9 @@ impl BallObject {
                 texture_key,
             },
             radius: radius,
-            stuck: true
+            stuck: true,
+            sticky: false,
+            pass_through: false,
         }
     }
 
