@@ -1,9 +1,9 @@
-use std::{time::Duration, collections::HashMap, thread};
+use std::{time::Duration, collections::HashMap, thread, sync::mpsc::{self, Sender}, io::{BufReader, Cursor}};
 
 use cgmath::{Vector2, Matrix4, Point2, Vector3, Deg, InnerSpace, EuclideanSpace};
 use glium::{Display, Surface};
 use rand::{rngs::StdRng, SeedableRng, Rng};
-use rodio::{OutputStream, Sink, Source};
+use rodio::{OutputStream, Sink, Decoder};
 use rust_opengl_learn::{create_program, utils::clamp_vec2};
 
 use crate::{game_object::GameObject, sprite_renderer::SpriteRenderer, resource_manager::{ResourceManager, load_audio}, game_level::GameLevel, ball_object::BallObject, particle_generator::ParticleGenerator, post_processor::PostProcessor, PlayerController, power_up::{PowerUp, PowerUpType}};
@@ -34,7 +34,7 @@ pub struct Game<'a> {
     effects: Option<PostProcessor>,
     power_ups: Vec<PowerUp>,
     rng: StdRng,
-    audio_effects_sink: Sink,
+    effect_sender: Option<Sender<Cursor<Vec<u8>>>>,
 }
 
 impl <'a> Game<'a> {
@@ -43,9 +43,6 @@ impl <'a> Game<'a> {
         let player_position = Point2::new(width as f32 / 2.0 - player_size.x / 2.0, height as f32 - player_size.y);
         // 计算球的初始位置，球的位置应该在挡板上边
         let ball_position = player_position + Vector2::new(player_size.x / 2.0 - ball_radius, -ball_radius * 2.0);
-        // 游戏音频sink初始化
-        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-        let effect_sink = Sink::try_new(&stream_handle).unwrap();
 
         Self {
             state: GameState::GAME_ACTIVE,
@@ -72,7 +69,7 @@ impl <'a> Game<'a> {
             effects: None,
             power_ups: vec![],
             rng: StdRng::seed_from_u64(0),
-            audio_effects_sink: effect_sink,
+            effect_sender: None,
         }
     }
 
@@ -94,6 +91,10 @@ impl <'a> Game<'a> {
         self.resource_manager.load_texture("increase", "src/textures/powerup_increase.png", display);
         self.resource_manager.load_texture("confuse", "src/textures/powerup_confuse.png", display);
         self.resource_manager.load_texture("chaos", "src/textures/powerup_chaos.png", display);
+
+        self.resource_manager.load_audio("audio_bleep", "src/audio/bleep.wav");
+        self.resource_manager.load_audio("audio_power_up", "src/audio/powerup.wav");
+        self.resource_manager.load_audio("audio_solid", "src/audio/solid.wav");
         self.sprite_renderer = Some(SpriteRenderer::new(
             display, 
             sprite_program
@@ -126,6 +127,18 @@ impl <'a> Game<'a> {
             let main_source = load_audio("src/audio/breakout.mp3");
             main_sink.append(main_source);
             main_sink.sleep_until_end();
+        });
+        let (effect_sender, effect_receiver) = mpsc::channel();
+        self.effect_sender = Some(effect_sender);
+        // 音效音频
+        thread::spawn(move || {
+            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+            let sink = Sink::try_new(&stream_handle).unwrap();
+            loop {
+                let source = effect_receiver.recv().unwrap();
+                sink.append(Decoder::new(BufReader::new(source)).unwrap());
+                sink.sleep_until_end();
+            }
         });
     }
 
@@ -347,6 +360,20 @@ impl <'a> Game<'a> {
         }
     }
 
+    fn play_effect_sound(sender: &Option<Sender<Cursor<Vec<u8>>>>, resource_manager: &ResourceManager, solid: bool, power_up: bool) {
+        if let Some(effect_sender) = sender {
+            if solid {
+                let source = resource_manager.get_audio("audio_solid");
+                effect_sender.send(source);
+            } else if power_up {
+                let source = resource_manager.get_audio("audio_power_up");
+                effect_sender.send(source);
+            } else {
+                println!("不支持的音频");
+            }
+        }
+    }
+
     fn do_collisions(&mut self) {
         // 检测当前关卡中所有砖块的碰撞
         let level = self.levels.get_mut(self.level as usize).unwrap();
@@ -355,6 +382,8 @@ impl <'a> Game<'a> {
             if !brick.destroyed {
                 // 碰撞检测
                 if let Some((direction, vec)) = check_collisions_aabb_round(&self.ball, &brick) {
+                    Game::play_effect_sound(&self.effect_sender, &self.resource_manager, brick.is_solid, false);
+                    
                     if !brick.is_solid {
                         // 摧毁砖块
                         brick.destroyed = true;
@@ -437,6 +466,8 @@ impl <'a> Game<'a> {
                     if let Some(effects) = &mut self.effects {
                         Game::activate_power_up(&mut self.player, &mut self.ball, effects, &power_up);
                     }
+
+                    Game::play_effect_sound(&self.effect_sender, &self.resource_manager, false, true);
                 }
             }
         }

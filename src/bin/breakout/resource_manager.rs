@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io::{BufReader, Cursor}, fs::{self}};
 
 use glium::{Display, texture::Texture2d};
-use rodio::{Decoder};
+use rodio::{Decoder, source::{Buffered, SineWave}, Source};
 use rust_opengl_learn::material;
 
 
@@ -10,7 +10,7 @@ pub struct ResourceManager<'a> {
     
     textures: HashMap<&'a str, Texture2d>,
 
-    audios: HashMap<&'a str, Decoder<BufReader<Cursor<Vec<u8>>>>>,
+    audios: HashMap<&'a str, Cursor<Vec<u8>>>,
 }
 
 impl <'a> ResourceManager<'a> {
@@ -28,8 +28,12 @@ impl <'a> ResourceManager<'a> {
     }
 
     pub fn load_audio(&mut self, key: &'a str, path: &str) {
-        let source = load_audio(path);
+        let source = Cursor::new(fs::read(path).unwrap());
         self.audios.insert(key, source);
+    }
+
+    pub fn get_audio(&self, key: &'a str) -> Cursor<Vec<u8>> {
+        self.audios.get(key).unwrap().clone()
     }
 }
 
