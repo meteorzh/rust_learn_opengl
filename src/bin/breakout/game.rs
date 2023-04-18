@@ -92,7 +92,8 @@ impl <'a> Game<'a> {
         self.resource_manager.load_texture("confuse", "src/textures/powerup_confuse.png", display);
         self.resource_manager.load_texture("chaos", "src/textures/powerup_chaos.png", display);
 
-        self.resource_manager.load_audio("audio_bleep", "src/audio/bleep.wav");
+        self.resource_manager.load_audio("audio_bleep_brick", "src/audio/bleep.mp3");
+        self.resource_manager.load_audio("audio_bleep_player", "src/audio/bleep.wav");
         self.resource_manager.load_audio("audio_power_up", "src/audio/powerup.wav");
         self.resource_manager.load_audio("audio_solid", "src/audio/solid.wav");
         self.sprite_renderer = Some(SpriteRenderer::new(
@@ -360,17 +361,10 @@ impl <'a> Game<'a> {
         }
     }
 
-    fn play_effect_sound(sender: &Option<Sender<Cursor<Vec<u8>>>>, resource_manager: &ResourceManager, solid: bool, power_up: bool) {
+    fn play_effect_sound(sender: &Option<Sender<Cursor<Vec<u8>>>>, resource_manager: &ResourceManager, sound_key: &str) {
         if let Some(effect_sender) = sender {
-            if solid {
-                let source = resource_manager.get_audio("audio_solid");
-                effect_sender.send(source);
-            } else if power_up {
-                let source = resource_manager.get_audio("audio_power_up");
-                effect_sender.send(source);
-            } else {
-                println!("不支持的音频");
-            }
+            let source = resource_manager.get_audio(sound_key);
+            effect_sender.send(source).unwrap();
         }
     }
 
@@ -382,17 +376,20 @@ impl <'a> Game<'a> {
             if !brick.destroyed {
                 // 碰撞检测
                 if let Some((direction, vec)) = check_collisions_aabb_round(&self.ball, &brick) {
-                    Game::play_effect_sound(&self.effect_sender, &self.resource_manager, brick.is_solid, false);
-                    
                     if !brick.is_solid {
                         // 摧毁砖块
                         brick.destroyed = true;
                         power_up_positions.push(brick.position);
+                        
+                        // 音效
+                        Game::play_effect_sound(&self.effect_sender, &self.resource_manager, "audio_bleep_brick");
                     } else {
                         // 实心砖块，激活shake特效
                         if let Some(effects) = &mut self.effects {
                             effects.start_shake(0.05);
                         }
+                        // 音效
+                        Game::play_effect_sound(&self.effect_sender, &self.resource_manager, "audio_solid");
                     }
                     // 处理碰撞
                     // 不能穿过或者碰墙则反弹，能穿过并且不是墙则穿过
@@ -441,6 +438,8 @@ impl <'a> Game<'a> {
                 // let tmp_velocity = Vector2::new(INITIAL_BALL_VELOCITY.x * percentage * strength, -old_velocity.y);
                 let tmp_velocity = Vector2::new(INITIAL_BALL_VELOCITY.x * percentage * strength, -num_traits::abs(old_velocity.y)); // 处理粘板问题
                 self.ball.game_object.velocity = tmp_velocity.normalize() * old_velocity.magnitude();
+
+                Game::play_effect_sound(&self.effect_sender, &self.resource_manager, "audio_bleep_player")
             }
         }
 
@@ -467,7 +466,7 @@ impl <'a> Game<'a> {
                         Game::activate_power_up(&mut self.player, &mut self.ball, effects, &power_up);
                     }
 
-                    Game::play_effect_sound(&self.effect_sender, &self.resource_manager, false, true);
+                    Game::play_effect_sound(&self.effect_sender, &self.resource_manager, "audio_power_up");
                 }
             }
         }
