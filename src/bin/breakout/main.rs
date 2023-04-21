@@ -20,6 +20,7 @@ mod post_processor;
 mod power_up;
 mod resource_manager;
 mod sprite_renderer;
+mod text_renderer;
 
 /// BreakOut 2D Game
 fn main() {
@@ -32,9 +33,7 @@ fn main() {
     display.gl_window().window().set_cursor_grab(CursorGrabMode::Confined).unwrap();
     display.gl_window().window().set_cursor_visible(false);
 
-    let mut breakout = Game::new(size.width, size.height, Vector2::new(100.0, 20.0), 12.5);
-
-    breakout.init(&display);
+    let mut breakout = Game::new(&display, size.width, size.height, Vector2::new(100.0, 20.0), 12.5);
 
     let player_controller = PlayerController::new();
 
@@ -58,7 +57,7 @@ fn main() {
         // 更新游戏中其它数据
         breakout.update(dt);
 
-        breakout.render(&mut target, dt);
+        breakout.render(&mut target, &display, dt);
 
         target.finish().unwrap();
 
@@ -137,6 +136,10 @@ pub struct PlayerController {
     amount_right: f32,
     amount_mouse_x: f32,
     launch_trigger: bool,
+
+    enter_pressed: bool,
+    w_pressed: bool,
+    s_pressed: bool,
 }
 
 impl PlayerController {
@@ -146,6 +149,9 @@ impl PlayerController {
             amount_right: 0.0,
             amount_mouse_x: 0.0,
             launch_trigger: false,
+            enter_pressed: false,
+            w_pressed: false,
+            s_pressed: false,
         }
     }
 }
@@ -174,7 +180,7 @@ impl KeyboardInteract for PlayerController {
     }
 
     fn interact_keycodes(&self) -> Vec<VirtualKeyCode> {
-        vec![VirtualKeyCode::A, VirtualKeyCode::D, VirtualKeyCode::Left, VirtualKeyCode::Right, VirtualKeyCode::Space]
+        vec![VirtualKeyCode::A, VirtualKeyCode::D, VirtualKeyCode::Left, VirtualKeyCode::Right, VirtualKeyCode::Space, VirtualKeyCode::W, VirtualKeyCode::Return]
     }
 
     fn interact(&mut self, input: KeyboardInput) {
@@ -187,6 +193,18 @@ impl KeyboardInteract for PlayerController {
                 self.amount_right = amount;
             } else if k == VirtualKeyCode::Space {
                 self.launch_trigger = state == ElementState::Released;
+            } else {
+                // nothing
+            }
+
+            if state == ElementState::Released {
+                if k == VirtualKeyCode::W && !self.w_pressed {
+                    self.w_pressed = true;
+                } else if k == VirtualKeyCode::S && !self.s_pressed {
+                    self.s_pressed = true;
+                } else if k == VirtualKeyCode::Return && !self.enter_pressed {
+                    self.enter_pressed = true;
+                }
             }
         }
     }

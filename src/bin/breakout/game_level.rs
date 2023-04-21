@@ -67,7 +67,7 @@ impl GameLevel {
         }
     }
 
-    fn is_complete(&self) -> bool {
+    pub fn is_complete(&self) -> bool {
         self.destroyed_count == self.destroyable_count
     }
 
