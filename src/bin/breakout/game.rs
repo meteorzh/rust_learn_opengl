@@ -1,9 +1,10 @@
-use std::{time::Duration, collections::HashMap, thread, sync::mpsc::{self, Sender}, io::{BufReader, Cursor}};
+use std::{time::Duration, collections::HashMap, thread, io::{BufReader}};
 
 use cgmath::{Vector2, Matrix4, Point2, Vector3, Deg, InnerSpace, EuclideanSpace};
+use futures::executor::{ThreadPoolBuilder, ThreadPool};
 use glium::{Display, Surface};
 use rand::{rngs::StdRng, SeedableRng, Rng};
-use rodio::{OutputStream, Sink, Decoder};
+use rodio::{OutputStream, Sink, Decoder, Source};
 use rust_opengl_learn::{create_program, utils::clamp_vec2};
 
 use crate::{game_object::GameObject, sprite_renderer::SpriteRenderer, resource_manager::{ResourceManager, load_audio}, game_level::GameLevel, ball_object::BallObject, particle_generator::ParticleGenerator, post_processor::PostProcessor, PlayerController, power_up::{PowerUp, PowerUpType}, text_renderer::TextRenderer};
@@ -34,7 +35,7 @@ pub struct Game<'a> {
     effects: PostProcessor,
     power_ups: Vec<PowerUp>,
     rng: StdRng,
-    effect_sender: Option<Sender<Cursor<Vec<u8>>>>,
+    effect_sound_thread_pool: ThreadPool,
     text_renderer: TextRenderer,
 }
 
@@ -51,7 +52,7 @@ impl <'a> Game<'a> {
         let text_program = create_program("src/bin/breakout/text_2d.vert", "src/bin/breakout/text_2d.frag", display);
 
         let mut game = Self {
-            state: GameState::GameActive,
+            state: GameState::GameMenu,
             width,
             height,
             projection: cgmath::ortho(0.0, width as f32, height as f32, 0.0, -1.0, 1.0),
@@ -83,7 +84,7 @@ impl <'a> Game<'a> {
             effects: PostProcessor::new(display, effects_program, width, height),
             power_ups: vec![],
             rng: StdRng::seed_from_u64(0),
-            effect_sender: None,
+            effect_sound_thread_pool: ThreadPoolBuilder::new().pool_size(4).create().unwrap(),
             text_renderer: TextRenderer::new(text_program, width, height),
         };
 
@@ -126,25 +127,13 @@ impl <'a> Game<'a> {
         // 加载字体
         self.text_renderer.load(display, "src/fonts/OCRAEXT.TTF", 24);
 
-        // 游戏音频，开启新线程播放
+        // 游戏音频，需要全程播放，所以开启新线程执行
         thread::spawn(|| {
             let (_stream, stream_handle) = OutputStream::try_default().unwrap();
             let main_sink = Sink::try_new(&stream_handle).unwrap();
             let main_source = load_audio("src/audio/breakout.mp3");
-            main_sink.append(main_source);
+            main_sink.append(main_source.repeat_infinite());
             main_sink.sleep_until_end();
-        });
-        let (effect_sender, effect_receiver) = mpsc::channel();
-        self.effect_sender = Some(effect_sender);
-        // 音效音频
-        thread::spawn(move || {
-            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-            let sink = Sink::try_new(&stream_handle).unwrap();
-            loop {
-                let source = effect_receiver.recv().unwrap();
-                sink.append(Decoder::new(BufReader::new(source)).unwrap());
-                sink.sleep_until_end();
-            }
         });
     }
 
@@ -413,11 +402,15 @@ impl <'a> Game<'a> {
         }
     }
 
-    fn play_effect_sound(sender: &Option<Sender<Cursor<Vec<u8>>>>, resource_manager: &ResourceManager, sound_key: &str) {
-        if let Some(effect_sender) = sender {
-            let source = resource_manager.get_audio(sound_key);
-            effect_sender.send(source).unwrap();
-        }
+    fn play_effect_sound(thread_pool: &ThreadPool, resource_manager: &ResourceManager, sound_key: &str) {
+        let source = resource_manager.get_audio(sound_key);
+        let task = async {
+            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+            let sink = Sink::try_new(&stream_handle).unwrap();
+            sink.append(Decoder::new(BufReader::new(source)).unwrap());
+            sink.sleep_until_end();
+        };
+        thread_pool.spawn_ok(task);
     }
 
     fn do_collisions(&mut self) {
@@ -431,15 +424,16 @@ impl <'a> Game<'a> {
                     if !brick.is_solid {
                         // 摧毁砖块
                         brick.destroyed = true;
+                        level.destroyed_count += 1;
                         power_up_positions.push(brick.position);
                         
                         // 音效
-                        Game::play_effect_sound(&self.effect_sender, &self.resource_manager, "audio_bleep_brick");
+                        Game::play_effect_sound(&self.effect_sound_thread_pool, &self.resource_manager, "audio_bleep_brick");
                     } else {
                         // 实心砖块，激活shake特效
                         self.effects.start_shake(0.05);
                         // 音效
-                        Game::play_effect_sound(&self.effect_sender, &self.resource_manager, "audio_solid");
+                        Game::play_effect_sound(&self.effect_sound_thread_pool, &self.resource_manager, "audio_solid");
                     }
                     // 处理碰撞
                     // 不能穿过或者碰墙则反弹，能穿过并且不是墙则穿过
@@ -489,7 +483,7 @@ impl <'a> Game<'a> {
                 let tmp_velocity = Vector2::new(INITIAL_BALL_VELOCITY.x * percentage * strength, -num_traits::abs(old_velocity.y)); // 处理粘板问题
                 self.ball.game_object.velocity = tmp_velocity.normalize() * old_velocity.magnitude();
 
-                Game::play_effect_sound(&self.effect_sender, &self.resource_manager, "audio_bleep_player")
+                Game::play_effect_sound(&self.effect_sound_thread_pool, &self.resource_manager, "audio_bleep_player")
             }
         }
 
@@ -514,7 +508,7 @@ impl <'a> Game<'a> {
                     // 激活道具
                     Game::activate_power_up(&mut self.player, &mut self.ball, &mut self.effects, &power_up);
 
-                    Game::play_effect_sound(&self.effect_sender, &self.resource_manager, "audio_power_up");
+                    Game::play_effect_sound(&self.effect_sound_thread_pool, &self.resource_manager, "audio_power_up");
                 }
             }
         }
@@ -559,6 +553,8 @@ impl <'a> Game<'a> {
         // 渲染文字
         let live_str = format!("Lives: {}", self.lives);
         self.text_renderer.render_text(surface, display, &live_str, 5.0, 5.0, 1.0, Vector3::new(1.0, 1.0, 1.0));
+        let level_str = format!("Level: {}", self.level + 1);
+        self.text_renderer.render_text(surface, display, &level_str, 5.0, 30.0, 1.0, Vector3::new(1.0, 1.0, 1.0));
 
         // 游戏在菜单状态时渲染菜单
         if self.state == GameState::GameMenu {

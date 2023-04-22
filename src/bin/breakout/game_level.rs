@@ -17,7 +17,7 @@ const HARD_BRICK: u8 = 1;
 /// 游戏关卡
 pub struct GameLevel {
     pub bricks: Vec<GameObject>,
-    destroyed_count: u32,
+    pub destroyed_count: u32,
     destroyable_count: u32,
 }
 
