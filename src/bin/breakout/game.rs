@@ -143,8 +143,7 @@ impl <'a> Game<'a> {
             let amount = {
                 // 鼠标优先
                 if player_controller.amount_mouse_x != 0.0 {
-                    let amount = player_controller.amount_mouse_x * 0.7;
-                    player_controller.amount_mouse_x = 0.0;
+                    let amount = player_controller.amount_mouse_x;
                     amount
                 } else {
                     player_controller.amount_right - player_controller.amount_left
@@ -183,19 +182,16 @@ impl <'a> Game<'a> {
             if self.ball.stuck && player_controller.launch_trigger {
                 self.ball.stuck = false;
             }
-            player_controller.launch_trigger = false;
         }
 
         // 按键处理
         if self.state == GameState::GameMenu {
             if player_controller.enter_pressed {
                 self.state = GameState::GameActive;
-                player_controller.enter_pressed = false;
             }
 
             if player_controller.w_pressed {
                 self.level = (self.level + 1) % (self.levels.len() as u32);
-                player_controller.w_pressed = false;
             }
 
             if player_controller.s_pressed {
@@ -204,7 +200,6 @@ impl <'a> Game<'a> {
                 } else {
                     self.level = self.levels.len() as u32 - 1;
                 }
-                player_controller.s_pressed = false;
             }
         }
 
@@ -220,9 +215,10 @@ impl <'a> Game<'a> {
                     self.level += 1;
                     self.state = GameState::GameActive;
                 }
-                player_controller.enter_pressed = false;
             }
         }
+
+        player_controller.reset();
     }
 
     pub fn update(&mut self, dt: Duration) {

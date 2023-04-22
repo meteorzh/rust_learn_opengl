@@ -154,6 +154,17 @@ impl PlayerController {
             s_pressed: false,
         }
     }
+
+    pub fn reset(&mut self) {
+        self.amount_left = 0.0;
+        self.amount_right = 0.0;
+        self.amount_mouse_x = 0.0;
+        self.launch_trigger = false;
+
+        self.enter_pressed = false;
+        self.w_pressed = false;
+        self.s_pressed = false;
+    }
 }
 
 impl MouseInteract for PlayerController {
