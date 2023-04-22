@@ -51,9 +51,12 @@ impl GameLevel {
     pub fn reset(&mut self) {
         // 重置关卡
         self.destroyed_count = 0;
-        self.destroyable_count = self.bricks.len() as u32;
+        self.destroyable_count = 0;
         for brick in self.bricks.iter_mut() {
             brick.destroyed = false;
+            if !brick.is_solid {
+                self.destroyable_count += 1;
+            }
         }
     }
 

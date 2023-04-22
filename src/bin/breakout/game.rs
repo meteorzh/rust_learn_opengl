@@ -156,6 +156,7 @@ impl <'a> Game<'a> {
                 let mut move_stuck_ball = false;
                 // 更新玩家挡板的位置
                 let position = &mut self.player.position;
+                let player_old_x = position.x;
                 if amount > 0.0 {
                     // 往右
                     let max_x = self.width as f32 - self.player.size.x;
@@ -170,10 +171,11 @@ impl <'a> Game<'a> {
                         move_stuck_ball = true;
                     }
                 }
+                let delta_x = position.x - player_old_x;
 
-                // 若球被固定，更新球的位置
+                // 若球被固定，更新球的位置，球和玩家移动相同的量
                 if self.ball.stuck && move_stuck_ball {
-                    self.ball.game_object.position.x = position.x + self.player.size.x / 2.0 - self.ball.radius;
+                    self.ball.game_object.position.x += delta_x;
                 }
             }
 
@@ -536,6 +538,8 @@ impl <'a> Game<'a> {
             // 如果游戏激活，需要绘制球
             if self.state == GameState::GameActive {
                 self.ball.draw(&self.sprite_renderer, framebuffer, &self.resource_manager, self.projection);
+                // 渲染粒子
+                self.particle_generator.draw(framebuffer, &self.resource_manager, self.projection);
             }
             // 渲染道具
             for power_up in self.power_ups.iter() {
@@ -543,8 +547,6 @@ impl <'a> Game<'a> {
                     power_up.game_object.draw(&self.sprite_renderer, framebuffer, &self.resource_manager, self.projection);
                 }
             }
-            // 渲染粒子
-            self.particle_generator.draw(framebuffer, &self.resource_manager, self.projection);
         });
         
         // 将后期处理结果渲染到指定surface
